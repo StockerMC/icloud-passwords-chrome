@@ -32,7 +32,7 @@ export class AppleClient {
   private queues = new Map<number, Promise<unknown>>();
   private _capabilities?: Capabilities;
   onDisconnect?: (reason: string) => void;
-  // A code just arrived in Messages or Mail.
+  // A code just arrived in Messages.
   onOneTimeCode?: () => void;
 
   get connected() {
@@ -141,7 +141,7 @@ export class AppleClient {
   }
 
   // Lists codes for the frame: authenticator entries without a value, and
-  // codes from Messages or Mail with one.
+  // codes from Messages with one.
   async oneTimeCodes(tabId: number, frameId: number, frameURLs: string[], username?: string) {
     const body = { ACT: Action.GhostSearch, TYPE: "oneTimeCodes", frameURLs, ...(username && { username }) };
     const entries = await this.query(Command.GetOneTimeCodes, "CmdGetOneTimeCodes", { tabId, frameId }, body, 8000);

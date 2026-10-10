@@ -17,7 +17,7 @@ npm run build
 
 Focus a login field to get a menu of saved logins. Sign-up forms offer a strong
 password. Verification-code fields offer codes from the Passwords app and codes
-that just arrived in Messages or Mail. After logging in with a new login, a bar
+that just arrived in Messages. After logging in with a new login, a bar
 offers to save it through Apple's own save sheet. The popup lists logins, copies
 passwords and generates new ones.
 
