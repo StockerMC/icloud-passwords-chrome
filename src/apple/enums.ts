@@ -11,6 +11,7 @@ export const enum Command {
   GetCapabilities = 14,
   OneTimeCodeAvailable = 15,
   GetOneTimeCodes = 16,
+  DidFillOneTimeCode = 17,
 }
 
 export const enum PakeMessage {
@@ -51,4 +52,11 @@ export interface LoginName {
 
 export interface Credential extends LoginName {
   password: string;
+}
+
+export interface OneTimeCode {
+  source: string;
+  username: string;
+  domain: string;
+  code: string;
 }

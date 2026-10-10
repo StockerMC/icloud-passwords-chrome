@@ -1,5 +1,5 @@
 import { AppleClient, HelperError } from "./apple/client";
-import type { Credential, LoginName } from "./apple/enums";
+import type { Credential, LoginName, OneTimeCode } from "./apple/enums";
 import type { Request, Response, State } from "./messages";
 import type { PageMessage } from "./content";
 import { getSettings } from "./settings";
@@ -28,6 +28,18 @@ client.onDisconnect = () => {
   codeRequestedAt = 0;
   recent.clear();
 };
+
+client.onOneTimeCode = async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "CODE_ARRIVED" } satisfies PageMessage).catch(() => {});
+};
+
+// The frame's URL and those of its ancestors, which the helper matches codes against.
+async function frameURLs(sender: chrome.runtime.MessageSender) {
+  const urls = [sender.url!];
+  if (sender.tab?.url && sender.tab.url !== sender.url) urls.push(sender.tab.url);
+  return urls;
+}
 
 function state(): State {
   if (client.paired) return "ready";
@@ -161,6 +173,18 @@ async function handle(req: Request, sender: chrome.runtime.MessageSender): Promi
     case "OPEN_POPUP":
       await chrome.action.openPopup().catch(() => {});
       return { ok: true, state: state() };
+
+    case "PAGE_CODES":
+      if (!client.paired || !client.capabilities?.canFillOneTimeCodes) return { ok: true, codes: [] };
+      return { ok: true, codes: await client.oneTimeCodes(tabId, sender.frameId ?? 0, await frameURLs(sender)) };
+
+    case "PAGE_CODE": {
+      if (req.entry.code) return { ok: true, code: req.entry.code };
+      const codes = await client.readOneTimeCodes(tabId, sender.frameId ?? 0, await frameURLs(sender), req.entry.username || undefined);
+      const match = codes.find((c) => c.username === req.entry.username && c.code) ?? codes.find((c) => c.code);
+      if (!match) throw new Error("No code available");
+      return { ok: true, code: match.code };
+    }
   }
 }
 

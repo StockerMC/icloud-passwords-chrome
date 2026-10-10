@@ -8,6 +8,7 @@ import {
   Command,
   Credential,
   LoginName,
+  OneTimeCode,
   PakeMessage,
   Protocol,
   QueryStatus,
@@ -27,10 +28,12 @@ export class AppleClient {
   private port?: chrome.runtime.Port;
   private session?: SrpSession;
   private pending = new Map<number, Pending>();
-  private _capabilities?: Capabilities;
   // Replies carry no request id, so requests of one command run one at a time.
   private queues = new Map<number, Promise<unknown>>();
+  private _capabilities?: Capabilities;
   onDisconnect?: (reason: string) => void;
+  // A code just arrived in Messages or Mail.
+  onOneTimeCode?: () => void;
 
   get connected() {
     return this.port !== undefined;
@@ -50,7 +53,10 @@ export class AppleClient {
     this.port = port;
     port.onMessage.addListener((m: Message) => {
       const p = this.pending.get(m.cmd);
-      if (!p) return;
+      if (!p) {
+        if (m.cmd === Command.OneTimeCodeAvailable) this.onOneTimeCode?.();
+        return;
+      }
       this.pending.delete(m.cmd);
       clearTimeout(p.timer);
       p.resolve(m);
@@ -134,17 +140,30 @@ export class AppleClient {
     return { username: entry.USR as string, password: entry.PWD as string, sites: (entry.sites as string[]) ?? [] };
   }
 
+  // Lists codes for the frame: authenticator entries without a value, and
+  // codes from Messages or Mail with one.
+  async oneTimeCodes(tabId: number, frameId: number, frameURLs: string[], username?: string) {
+    const body = { ACT: Action.GhostSearch, TYPE: "oneTimeCodes", frameURLs, ...(username && { username }) };
+    const entries = await this.query(Command.GetOneTimeCodes, "CmdGetOneTimeCodes", { tabId, frameId }, body, 8000);
+    return entries.map(oneTimeCode);
+  }
+
+  // Reads current values right before filling. May block on Touch ID.
+  async readOneTimeCodes(tabId: number, frameId: number, frameURLs: string[], username?: string) {
+    const body = { ACT: Action.Search, TYPE: "oneTimeCodes", frameURLs, ...(username && { username }) };
+    const entries = await this.query(Command.DidFillOneTimeCode, "CmdDidFillOneTimeCode", { tabId, frameId }, body);
+    return entries.map(oneTimeCode);
+  }
+
   // The helper decides whether this is new or changed and shows its own
   // save sheet, and only replies once that is dismissed.
   async save(tabId: number, hostname: string, username: string, password: string) {
-    const session = this.session;
-    if (!session?.paired) throw new HelperError("Not paired");
     const body = { ACT: Action.MaybeAdd, URL: "", USR: "", PWD: "", NURL: hostname, NUSR: username, NPWD: password };
     try {
       await this.query(Command.SetPassword, "CmdNewAccount4URL", { tabId, frameId: 0 }, body, 20_000);
     } catch (e) {
       if (!(e instanceof HelperError && e.message === "Helper did not respond")) throw e;
-    });
+    }
   }
 
   close() {
@@ -181,6 +200,7 @@ export class AppleClient {
     if (!session?.paired) throw new HelperError("Not paired");
     const smsg = JSON.stringify({ TID: session.tid, SDATA: await session.encrypt(utf8(JSON.stringify(body))) });
     const reply = await this.send(cmd, { ...fields, payload: JSON.stringify({ QID: qid, SMSG: smsg }) }, timeout);
+    if (reply.payload === undefined) return [];
     const inner = asObject(asObject(reply.payload).SMSG);
     if (inner.TID !== session.tid) throw new HelperError("Reply for another session");
     const data = JSON.parse(fromUtf8(await session.decrypt(inner.SDATA as string)));
@@ -197,9 +217,15 @@ export class AppleClient {
   }
 
   private send(cmd: Command, body: object, timeout?: number) {
+    const previous = this.queues.get(cmd) ?? Promise.resolve();
+    const run = previous.then(() => this.sendNow(cmd, body, timeout), () => this.sendNow(cmd, body, timeout));
+    this.queues.set(cmd, run.catch(() => {}));
+    return run;
+  }
+
+  private sendNow(cmd: Command, body: object, timeout?: number) {
     const port = this.port;
     if (!port) return Promise.reject(new HelperError("Not connected"));
-    if (reply.payload === undefined) return [];
     return new Promise<Message>((resolve, reject) => {
       const p: Pending = { resolve, reject };
       if (timeout) {
@@ -214,15 +240,12 @@ export class AppleClient {
   }
 }
 
+function oneTimeCode(e: Record<string, unknown>): OneTimeCode {
+  return { source: String(e.source ?? ""), username: String(e.username ?? ""), domain: String(e.domain ?? ""), code: e.code == null ? "" : String(e.code) };
+}
+
 function pakeEncode(obj: object) {
   return btoa(String.fromCharCode(...utf8(JSON.stringify(obj))));
-    const previous = this.queues.get(cmd) ?? Promise.resolve();
-    const run = previous.then(() => this.sendNow(cmd, body, timeout), () => this.sendNow(cmd, body, timeout));
-    this.queues.set(cmd, run.catch(() => {}));
-    return run;
-  }
-
-  private sendNow(cmd: Command, body: object, timeout?: number) {
 }
 
 function base64Bytes(s: string) {

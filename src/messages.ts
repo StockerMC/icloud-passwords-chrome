@@ -1,4 +1,4 @@
-import type { Credential, LoginName } from "./apple/enums";
+import type { Credential, LoginName, OneTimeCode } from "./apple/enums";
 
 export type State = "disconnected" | "pairing" | "ready";
 
@@ -14,12 +14,16 @@ export type Request =
   | { type: "PAGE_CREDENTIAL"; login: LoginName }
   | { type: "SUBMITTED"; username: string; password: string; newPassword: boolean }
   | { type: "SAVE_PENDING"; accept: boolean }
-  | { type: "OPEN_POPUP" };
+  | { type: "OPEN_POPUP" }
+  | { type: "PAGE_CODES" }
+  | { type: "PAGE_CODE"; entry: OneTimeCode };
 
 export type Response =
   | { ok: true; state: State }
   | { ok: true; logins: LoginName[]; state: State }
   | { ok: true; credential: Credential }
+  | { ok: true; codes: OneTimeCode[] }
+  | { ok: true; code: string }
   | { ok: true; filled: { username: boolean; password: boolean } }
   | { ok: false; error: string };
 

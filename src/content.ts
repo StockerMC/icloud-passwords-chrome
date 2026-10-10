@@ -1,17 +1,18 @@
-import type { LoginName } from "./apple/enums";
+import type { LoginName, OneTimeCode } from "./apple/enums";
 import { generatePassword } from "./generate";
 import { send, type Response, type State } from "./messages";
 
 export type PageMessage =
   | { type: "FILL"; username: string; password: string }
-  | { type: "OFFER_SAVE"; username: string; hostname: string };
+  | { type: "OFFER_SAVE"; username: string; hostname: string }
+  | { type: "CODE_ARRIVED" };
 
 type Input = HTMLInputElement;
-type Kind = "username" | "password" | "newPassword";
+type Kind = "username" | "password" | "newPassword" | "otp";
 
 const USERNAME_HINTS = ["email", "mail", "user", "login", "account", "identifier", "phone"];
 const NEW_PASSWORD_HINTS = ["new", "confirm", "create", "signup", "sign-up", "register", "repeat", "verify"];
-const OTP_HINTS = ["otp", "one-time", "onetime", "totp", "verification", "2fa", "mfa"];
+const OTP_HINTS = ["otp", "one-time", "onetime", "totp", "verification", "2fa", "mfa", "passcode", "security code"];
 const ATTRS = ["autocomplete", "name", "id", "placeholder", "aria-label"];
 
 function attrs(input: Input) {
@@ -54,7 +55,7 @@ function isUsernameLike(input: Input) {
 
 function classify(el: EventTarget | null): Kind | null {
   if (!(el instanceof HTMLInputElement) || el.readOnly || el.disabled || !visible(el)) return null;
-  if (el.autocomplete === "one-time-code" || hinted(el, OTP_HINTS)) return null;
+  if (isOtp(el)) return "otp";
   if (el.type === "password") return isNewPassword(el) ? "newPassword" : "password";
   if (el.type === "search" || el.getAttribute("role") === "searchbox") return null;
   if (!isUsernameLike(el)) return null;
@@ -62,6 +63,25 @@ function classify(el: EventTarget | null): Kind | null {
   return passwordFields(scope(el)).length > 0 || el.autocomplete === "username" || el.autocomplete === "email" || hinted(el, ["email", "user", "login"])
     ? "username"
     : null;
+}
+
+function isOtp(input: Input) {
+  if (input.type === "password") return false;
+  if (input.autocomplete === "one-time-code" || hinted(input, OTP_HINTS)) return true;
+  const short = input.maxLength > 0 && input.maxLength <= 8;
+  return (short || input.inputMode === "numeric") && hinted(input, ["code", "pin"]);
+}
+
+// Sites that split the code into one box per digit.
+function digitBoxes(input: Input) {
+  const boxes = inputs(scope(input)).filter((i) => i.maxLength === 1 && visible(i) && !["password", "hidden"].includes(i.type));
+  return boxes.length >= 4 && boxes.length <= 8 && boxes.includes(input) ? boxes : null;
+}
+
+function fillCode(input: Input, code: string) {
+  const boxes = digitBoxes(input);
+  if (!boxes) return setValue(input, code);
+  [...code].forEach((ch, i) => boxes[i] && setValue(boxes[i], ch));
 }
 
 function usernameField(root: ParentNode, before?: Input) {
@@ -188,7 +208,27 @@ async function openMenu(input: Input, kind: Kind) {
   menu.box.replaceChildren();
   const items: HTMLElement[] = [];
 
-  if (kind === "newPassword") {
+  if (kind === "otp") {
+    const res = await send<{ ok: true; codes: OneTimeCode[] } | { ok: false; error: string }>({ type: "PAGE_CODES" });
+    if (anchor !== input) return;
+    if (!res.ok) items.push(muted(res.error));
+    else if (res.codes.length === 0) {
+      closeMenu();
+      return;
+    } else {
+      for (const entry of res.codes) {
+        const from = entry.source === "totp" ? entry.username || entry.domain : entry.source ? `From ${entry.source}` : entry.domain;
+        items.push(
+          row(entry.code || "Verification code", from || undefined, async () => {
+            const r = await send<{ ok: true; code: string } | { ok: false; error: string }>({ type: "PAGE_CODE", entry });
+            if (!r.ok) return;
+            closeMenu();
+            fillCode(input, r.code);
+          }),
+        );
+      }
+    }
+  } else if (kind === "newPassword") {
     items.push(
       row("Use strong password", undefined, () => {
         const password = generatePassword();
@@ -336,4 +376,9 @@ function offerSave(username: string, hostname: string) {
 chrome.runtime.onMessage.addListener((msg: PageMessage, _sender, respond: (r: object) => void) => {
   if (msg.type === "FILL") respond(fill(document.activeElement instanceof HTMLInputElement ? document.activeElement : null, msg.username, msg.password));
   else if (msg.type === "OFFER_SAVE") (offerSave(msg.username, msg.hostname), respond({ ok: true }));
+  else if (msg.type === "CODE_ARRIVED") {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && isOtp(active)) openMenu(active, "otp");
+    respond({ ok: true });
+  }
 });
