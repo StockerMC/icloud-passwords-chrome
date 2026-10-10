@@ -10,9 +10,12 @@ const dist = path.join(root, "dist");
 const pinFile = path.join(root, "e2e", ".pin");
 const exe = process.env.BROWSER ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const hosts = (process.env.HOSTS ?? "github.com,google.com").split(",");
+// The keychain won't store a login for localhost, so saving is tried on a public test page.
+const saveSite = process.env.SAVE_SITE ?? "https://the-internet.herokuapp.com/login";
 
 const pages = {
   "/": `<form><input name="email" type="email" placeholder="Email"><input name="pw" type="password"><button>Sign in</button></form>`,
+  "/otp": `<form><input name="code" autocomplete="one-time-code" inputmode="numeric"><button>Verify</button></form>`,
   "/signup": `<form><input name="email" type="email"><input name="pw" type="password" autocomplete="new-password"><input name="pw2" type="password" autocomplete="new-password"><button>Create</button></form>`,
 };
 const server = createServer((req, res) => {
@@ -33,6 +36,7 @@ const { id } = await cdp.send("Extensions.loadUnpacked", { path: dist });
 console.log("extension id", id);
 
 const site = await ctx.newPage();
+site.on("console", (m) => m.type() === "warning" && console.log("[page]", m.text()));
 await site.goto("http://localhost:8787/");
 const popup = await ctx.newPage();
 popup.on("console", (m) => console.log("[popup]", m.text()));
@@ -83,22 +87,28 @@ await site.keyboard.press("Enter");
 const generated = await site.evaluate(() => [...document.querySelectorAll("input[type=password]")].map((i) => i.value));
 console.log("generator:", generated[0] && generated[0] === generated[1] ? `filled both fields (${generated[0].length} chars)` : `unexpected ${JSON.stringify(generated)}`);
 
-await site.goto("http://localhost:8787/");
-await site.fill("input[name=email]", "e2e@example.com");
-await site.fill("input[name=pw]", "hunter2-e2e");
-await site.press("input[name=pw]", "Enter");
-const barShown = await site.waitForSelector('[data-icloud-passwords="bar"]', { state: "attached", timeout: 10000 }).then(() => true, () => false);
+await site.goto("http://localhost:8787/otp");
+await site.focus("input[name=code]");
+await new Promise((r) => setTimeout(r, 1500));
+console.log("otp field: menu stays closed with no codes:", !(await site.$(menu)));
+
+await site.goto(saveSite, { waitUntil: "domcontentloaded", timeout: 60000 });
+const saveHost = new URL(saveSite).hostname;
+await site.fill("input[type=password]", "hunter2-e2e");
+await site.fill("input:not([type=password]):not([type=hidden]):not([type=submit])", "e2e@example.com");
+await site.press("input[type=password]", "Enter");
+const barShown = await site.waitForSelector('[data-icloud-passwords="bar"]', { state: "attached", timeout: 60000 }).then(() => true, () => false);
 console.log("save bar:", barShown ? "offered for an unknown login" : "NOT shown");
 if (barShown) {
   await clickInClosedShadow(site, "BUTTON", "Save");
   console.log("clicked Save; accept the macOS sheet if one appears");
   for (let i = 0; i < 12; i++) {
     await new Promise((r) => setTimeout(r, 5000));
-    const r = await popup.evaluate((m) => chrome.runtime.sendMessage(m), { type: "LOGINS", tabId: siteTabId, url: "http://localhost:8787/" });
+    const r = await popup.evaluate((m) => chrome.runtime.sendMessage(m), { type: "LOGINS", tabId: siteTabId, url: saveSite });
     if (r.ok && r.logins.length) break;
   }
-  const after = await popup.evaluate((m) => chrome.runtime.sendMessage(m), { type: "LOGINS", tabId: siteTabId, url: "http://localhost:8787/" });
-  console.log("localhost logins now:", after.ok ? after.logins.map((l) => l.username).join(", ") || "(none)" : after.error);
+  const after = await popup.evaluate((m) => chrome.runtime.sendMessage(m), { type: "LOGINS", tabId: siteTabId, url: saveSite });
+  console.log(`${saveHost} logins now:`, after.ok ? after.logins.map((l) => l.username).join(", ") || "(none)" : after.error);
 }
 
 await popup.screenshot({ path: path.join(root, "e2e", "popup.png") });
