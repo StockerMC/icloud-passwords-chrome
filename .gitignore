@@ -1,0 +1,9 @@
+node_modules/
+dist/
+e2e/profile/
+.playwright-mcp/
+e2e/run.log
+e2e/popup.png
+e2e/.pin
+RESEARCH.md
+probe/

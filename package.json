@@ -1,0 +1,19 @@
+{
+  "name": "icloud-passwords-chrome",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "node e2e/pair.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.4",
+    "esbuild": "^0.25.10",
+    "playwright": "^1.64.0",
+    "typescript": "^5.9.0"
+  }
+}
