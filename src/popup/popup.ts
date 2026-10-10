@@ -1,4 +1,5 @@
 import type { LoginName } from "../apple/enums";
+import { generatePassword } from "../generate";
 import { send, type Response, type State } from "../messages";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -104,6 +105,12 @@ $("new-code").addEventListener("click", async () => {
   if (!res.ok) return fail(res.error);
   $<HTMLInputElement>("pin").value = "";
   show("pair");
+});
+
+$("generate").addEventListener("click", async () => {
+  await navigator.clipboard.writeText(generatePassword());
+  $("generate").textContent = "Copied to clipboard";
+  setTimeout(() => ($("generate").textContent = "Generate password"), 1500);
 });
 
 $("retry").addEventListener("click", start);
