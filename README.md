@@ -1,6 +1,6 @@
 # iCloud Passwords for Chrome
 
-Fill passwords from Apple Passwords (iCloud Keychain) in Chrome and Brave on macOS.
+Fill passwords from Apple Passwords (iCloud Keychain) in Chrome, Brave and other Chromium browsers on macOS.
 An open replacement for Apple's iCloud Passwords extension.
 
 It talks to the same helper Apple's extension uses
