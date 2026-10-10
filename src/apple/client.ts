@@ -1,0 +1,215 @@
+// One native-messaging connection to Apple's helper plus the SRP session on
+// top of it. Pairing is tied to the connection: a new port means a new code.
+
+import { fromUtf8, utf8 } from "./bytes";
+import {
+  Action,
+  Capabilities,
+  Command,
+  Credential,
+  LoginName,
+  PakeMessage,
+  Protocol,
+  QueryStatus,
+} from "./enums";
+import { SrpSession } from "./srp";
+
+const HOST = "com.apple.passwordmanager";
+const BROWSER_NAME = "Chrome";
+const VERSION = "1.0";
+
+type Message = { cmd: number; [key: string]: unknown };
+type Pending = { resolve: (m: Message) => void; reject: (e: Error) => void; timer?: number };
+
+export class HelperError extends Error {}
+
+export class AppleClient {
+  private port?: chrome.runtime.Port;
+  private session?: SrpSession;
+  private pending = new Map<number, Pending>();
+  private _capabilities?: Capabilities;
+  onDisconnect?: (reason: string) => void;
+
+  get connected() {
+    return this.port !== undefined;
+  }
+
+  get paired() {
+    return this.session?.paired ?? false;
+  }
+
+  get capabilities() {
+    return this._capabilities;
+  }
+
+  async connect() {
+    if (this.port) return;
+    const port = chrome.runtime.connectNative(HOST);
+    this.port = port;
+    port.onMessage.addListener((m: Message) => {
+      const p = this.pending.get(m.cmd);
+      if (!p) return;
+      this.pending.delete(m.cmd);
+      clearTimeout(p.timer);
+      p.resolve(m);
+    });
+    port.onDisconnect.addListener(() => {
+      const reason = chrome.runtime.lastError?.message ?? "Helper disconnected";
+      this.reset();
+      for (const p of this.pending.values()) p.reject(new HelperError(reason));
+      this.pending.clear();
+      this.onDisconnect?.(reason);
+    });
+
+    const { capabilities } = (await this.send(Command.GetCapabilities, {}, 5000)) as unknown as { capabilities: Capabilities };
+    if (
+      capabilities.secretSessionVersion !== undefined &&
+      capabilities.secretSessionVersion !== Protocol.SrpRfcVerification
+    ) {
+      throw new HelperError(`Unsupported session version ${capabilities.secretSessionVersion}`);
+    }
+    this._capabilities = capabilities;
+    this.session = new SrpSession(capabilities.shouldUseBase64 ?? false);
+  }
+
+  // Sends the client key; the helper responds by showing a 6-digit code.
+  async requestCode() {
+    await this.connect();
+    const session = this.session!;
+    const reply = await this.handshake({
+      QID: "m0",
+      PAKE: pakeEncode({
+        TID: session.tid,
+        MSG: PakeMessage.ClientKeyExchange,
+        A: session.clientPublicKey(),
+        VER: VERSION,
+        PROTO: [Protocol.SrpRfcVerification],
+      }),
+      HSTBRSR: BROWSER_NAME,
+    });
+    if (reply.TID !== session.tid) throw new HelperError("Handshake for another session");
+    if (reply.ErrCode !== undefined) throw new HelperError(`Handshake error ${reply.ErrCode}`);
+    if (Number(reply.MSG) !== PakeMessage.ServerKeyExchange) throw new HelperError("Unexpected handshake message");
+    if (Number(reply.PROTO) !== Protocol.SrpRfcVerification) throw new HelperError("Helper refused RFC verification");
+    session.setServer(reply.B as string, reply.s as string);
+  }
+
+  async submitCode(pin: string) {
+    const session = this.session;
+    if (!session) throw new HelperError("Not connected");
+    const M = await session.prove(pin.replace(/\D/g, ""));
+    const reply = await this.handshake({
+      QID: "m2",
+      PAKE: pakeEncode({ TID: session.tid, MSG: PakeMessage.ClientVerification, M }),
+    });
+    if (reply.TID !== session.tid) throw new HelperError("Handshake for another session");
+    if (Number(reply.MSG) !== PakeMessage.ServerVerification) throw new HelperError("Unexpected handshake message");
+    if (reply.ErrCode === 1) throw new HelperError("Incorrect code");
+    if (reply.ErrCode !== 0) throw new HelperError(`Handshake error ${reply.ErrCode}`);
+    await session.verifyServer(reply.HAMK as string);
+  }
+
+  async loginNames(tabId: number, hostname: string): Promise<LoginName[]> {
+    const entries = await this.query(
+      Command.GetLoginNamesForUrl,
+      "CmdGetLoginNames4URL",
+      { tabId, frameId: 0, url: hostname },
+      { ACT: Action.GhostSearch, URL: hostname },
+      10000,
+    );
+    return entries.map((e) => ({ username: e.USR as string, sites: (e.sites as string[]) ?? [] }));
+  }
+
+  // May block on Touch ID, so no timeout.
+  async password(tabId: number, hostname: string, login: LoginName): Promise<Credential> {
+    const [entry] = await this.query(
+      Command.GetPasswordForLoginName,
+      "CmdGetPassword4LoginName",
+      { tabId, frameId: 0, url: login.sites[0] ?? hostname },
+      { ACT: Action.Search, URL: hostname, USR: login.username },
+    );
+    if (!entry) throw new HelperError("No password returned");
+    return { username: entry.USR as string, password: entry.PWD as string, sites: (entry.sites as string[]) ?? [] };
+  }
+
+  close() {
+    if (!this.port) return;
+    try {
+      this.port.postMessage({ cmd: Command.End });
+      this.port.disconnect();
+    } catch {}
+    this.reset();
+  }
+
+  private reset() {
+    this.port = undefined;
+    this.session = undefined;
+    this._capabilities = undefined;
+  }
+
+  private async handshake(msg: object) {
+    const reply = await this.send(Command.Handshake, { msg: JSON.stringify(msg) }, 15000);
+    const payload = asObject(reply.payload);
+    const pake = payload.PAKE;
+    if (typeof pake !== "string") throw new HelperError("Handshake reply missing PAKE");
+    return JSON.parse(fromUtf8(base64Bytes(pake))) as Record<string, unknown>;
+  }
+
+  private async query(
+    cmd: Command,
+    qid: string,
+    fields: object,
+    body: object,
+    timeout?: number,
+  ): Promise<Record<string, unknown>[]> {
+    const session = this.session;
+    if (!session?.paired) throw new HelperError("Not paired");
+    const smsg = JSON.stringify({ TID: session.tid, SDATA: await session.encrypt(utf8(JSON.stringify(body))) });
+    const reply = await this.send(cmd, { ...fields, payload: JSON.stringify({ QID: qid, SMSG: smsg }) }, timeout);
+    const inner = asObject(asObject(reply.payload).SMSG);
+    if (inner.TID !== session.tid) throw new HelperError("Reply for another session");
+    const data = JSON.parse(fromUtf8(await session.decrypt(inner.SDATA as string)));
+    switch (data.STATUS) {
+      case QueryStatus.Success:
+        return data.Entries ?? [];
+      case QueryStatus.NoResults:
+        return [];
+      case QueryStatus.InvalidSession:
+        throw new HelperError("Session expired, pair again");
+      default:
+        throw new HelperError(`Helper returned status ${data.STATUS}`);
+    }
+  }
+
+  private send(cmd: Command, body: object, timeout?: number) {
+    const port = this.port;
+    if (!port) return Promise.reject(new HelperError("Not connected"));
+    if (this.pending.has(cmd)) return Promise.reject(new HelperError("Request already in flight"));
+    return new Promise<Message>((resolve, reject) => {
+      const p: Pending = { resolve, reject };
+      if (timeout) {
+        p.timer = setTimeout(() => {
+          this.pending.delete(cmd);
+          reject(new HelperError("Helper did not respond"));
+        }, timeout);
+      }
+      this.pending.set(cmd, p);
+      port.postMessage({ cmd, ...body });
+    });
+  }
+}
+
+function pakeEncode(obj: object) {
+  return btoa(String.fromCharCode(...utf8(JSON.stringify(obj))));
+}
+
+function base64Bytes(s: string) {
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+
+// macOS returns nested payloads as objects, iCloud for Windows as JSON strings.
+function asObject(v: unknown): Record<string, unknown> {
+  if (typeof v === "string") return JSON.parse(v);
+  if (v && typeof v === "object") return v as Record<string, unknown>;
+  throw new HelperError("Malformed reply");
+}
