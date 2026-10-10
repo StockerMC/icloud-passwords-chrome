@@ -2,6 +2,7 @@
 // the generator, and the save bar on a local page. BROWSER picks the executable.
 import { chromium } from "playwright";
 import { createServer } from "node:http";
+import { createHmac } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -45,18 +46,17 @@ await popup.waitForSelector("#view-pair:not([hidden])", { timeout: 20000 });
 console.log("PAIRING: type the code macOS shows into the popup tab and press Pair (or write it to e2e/.pin)");
 
 const deadline = Date.now() + 15 * 60_000;
-let pin;
-while (!pin && Date.now() < deadline) {
-  if (await popup.$("#view-logins:not([hidden])")) break;
-  if (fs.existsSync(pinFile)) pin = fs.readFileSync(pinFile, "utf8").trim();
-  else await new Promise((r) => setTimeout(r, 1000));
+const status = () => popup.evaluate(() => chrome.runtime.sendMessage({ type: "STATUS" }).then((r) => r.state));
+while ((await status()) !== "ready" && Date.now() < deadline) {
+  if (fs.existsSync(pinFile)) {
+    await popup.fill("#pin", fs.readFileSync(pinFile, "utf8").trim());
+    await popup.press("#pin", "Enter");
+    fs.rmSync(pinFile);
+  }
+  await new Promise((r) => setTimeout(r, 1000));
 }
-if (pin) {
-  await popup.fill("#pin", pin);
-  await popup.press("#pin", "Enter");
-}
-await popup.waitForSelector("#view-logins:not([hidden]), #view-error:not([hidden])", { timeout: 30000 });
-console.log("after pair:", (await popup.textContent("#view-logins")).trim() || (await popup.textContent("#view-error")).trim());
+if ((await status()) !== "ready") throw new Error("not paired");
+console.log("paired");
 
 // A worker that died takes the session with it, so "ready" after idling means it survived.
 if (process.env.IDLE_MIN) {
@@ -111,6 +111,26 @@ if (barShown) {
   console.log(`${saveHost} logins now:`, after.ok ? after.logins.map((l) => l.username).join(", ") || "(none)" : after.error);
 }
 
+// With TOTP_SECRET set up on the save site's entry in the Passwords app, the
+// code the menu fills must match the one computed here.
+if (process.env.TOTP_SECRET) {
+  await site.goto(saveSite, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await site.evaluate(() => {
+    const i = Object.assign(document.createElement("input"), { autocomplete: "one-time-code", name: "otp" });
+    document.body.prepend(i);
+  });
+  await site.focus("input[name=otp]");
+  const shown = await site.waitForSelector(menu, { state: "attached", timeout: 10000 }).then(() => true, () => false);
+  if (shown) {
+    await site.keyboard.press("ArrowDown");
+    await site.keyboard.press("Enter");
+    await site.waitForFunction(() => document.querySelector("input[name=otp]").value.length > 0, null, { timeout: 60000 }).catch(() => {});
+    const filled = await site.inputValue("input[name=otp]");
+    const expected = totp(process.env.TOTP_SECRET);
+    console.log("totp:", filled ? `filled ${filled}, expected ${expected}: ${filled === expected ? "MATCH" : "MISMATCH"}` : "nothing filled");
+  } else console.log("totp: no menu on the code field");
+}
+
 await popup.screenshot({ path: path.join(root, "e2e", "popup.png") });
 await ctx.close();
 server.close();
@@ -133,4 +153,16 @@ async function clickInClosedShadow(page, nodeName, text) {
     stack.push(...(n.children ?? []), ...(n.shadowRoots ?? []));
   }
   throw new Error(`no <${nodeName}> with text ${text}`);
+}
+
+function totp(base32, step = 30, digits = 6) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const c of base32.toUpperCase().replace(/=+$/, "")) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 1000 / step)));
+  const h = createHmac("sha1", key).update(counter).digest();
+  const o = h[h.length - 1] & 15;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 10 ** digits).padStart(digits, "0");
 }
