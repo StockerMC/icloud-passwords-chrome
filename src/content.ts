@@ -292,7 +292,7 @@ document.addEventListener("submit", (e) => {
 
 document.addEventListener("click", (e) => {
   const el = (e.target as Element | null)?.closest?.("button, input[type=submit], input[type=image], [role=button]");
-  if (!(el instanceof HTMLElement) || el === menu.host) return;
+  if (!(el instanceof HTMLElement) || el === menu.host || el === bar.host) return;
   const form = el.closest("form");
   if (form) reportSubmission(form);
   else if (passwordFields(document).some((p) => p.value)) reportSubmission(document);

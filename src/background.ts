@@ -68,7 +68,7 @@ function recordSubmission(tabId: number, url: string, req: Extract<Request, { ty
 
   const existing = pendingSaves.get(tabId);
   clearTimeout(existing?.timer);
-  const pending: PendingSave = { hostname: host, username, password: req.password, newPassword: req.newPassword, at: Date.now(), offered: false };
+  const pending: PendingSave = { hostname: new URL(url).host, username, password: req.password, newPassword: req.newPassword, at: Date.now(), offered: false };
   // Logins that never navigate (single-page apps) get evaluated on a timer.
   pending.timer = setTimeout(() => offerSave(tabId), 2500);
   pendingSaves.set(tabId, pending);
@@ -79,7 +79,7 @@ async function offerSave(tabId: number) {
   if (!pending || pending.offered || !client.paired) return;
   pending.offered = true;
   clearTimeout(pending.timer);
-  const known = await client.loginNames(tabId, pending.hostname).catch(() => [] as LoginName[]);
+  const known = await client.loginNames(tabId, pending.hostname.replace(/:\d+$/, "")).catch(() => [] as LoginName[]);
   const unknown = !known.some((l) => l.username === pending.username);
   if (!unknown && !pending.newPassword) {
     pendingSaves.delete(tabId);
