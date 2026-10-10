@@ -1,4 +1,5 @@
-// Pairs the built extension with the helper in Brave, lists logins, fills a local form.
+// Pairs the built extension with the helper, lists logins, fills a local form.
+// BROWSER picks the executable; it must be signed and honor --load-extension.
 import { chromium } from "playwright";
 import { createServer } from "node:http";
 import fs from "node:fs";
@@ -47,6 +48,14 @@ if (pin) {
 }
 await popup.waitForSelector("#view-logins:not([hidden]), #view-error:not([hidden])", { timeout: 30000 });
 console.log("after pair:", (await popup.textContent("#view-logins")).trim() || (await popup.textContent("#view-error")).trim());
+
+const instance = await sw.evaluate(() => (globalThis.__instance ??= Math.random().toString(36).slice(2)));
+if (process.env.IDLE_MIN) {
+  console.log(`idling ${process.env.IDLE_MIN} min`);
+  await new Promise((r) => setTimeout(r, Number(process.env.IDLE_MIN) * 60_000));
+  const same = ctx.serviceWorkers()[0] === sw && (await sw.evaluate(() => globalThis.__instance)) === instance;
+  console.log("worker survived idle:", same);
+}
 
 const siteTabId = await popup.evaluate(async () => (await chrome.tabs.query({ url: "http://localhost:8787/*" }))[0].id);
 for (const h of hosts) {
