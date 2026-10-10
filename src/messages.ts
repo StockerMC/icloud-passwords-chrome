@@ -9,11 +9,16 @@ export type Request =
   | { type: "LOGINS"; tabId: number; url: string }
   | { type: "FILL"; tabId: number; url: string; login: LoginName }
   | { type: "PASSWORD"; tabId: number; url: string; login: LoginName }
-  | { type: "LOCK" };
+  | { type: "LOCK" }
+  | { type: "PAGE_LOGINS" }
+  | { type: "PAGE_CREDENTIAL"; login: LoginName }
+  | { type: "SUBMITTED"; username: string; password: string; newPassword: boolean }
+  | { type: "SAVE_PENDING"; accept: boolean }
+  | { type: "OPEN_POPUP" };
 
 export type Response =
   | { ok: true; state: State }
-  | { ok: true; logins: LoginName[] }
+  | { ok: true; logins: LoginName[]; state: State }
   | { ok: true; credential: Credential }
   | { ok: true; filled: { username: boolean; password: boolean } }
   | { ok: false; error: string };
