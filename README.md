@@ -24,7 +24,8 @@ same profile; two extensions cannot share an ID.
 
 Click the toolbar icon or press ⌘⇧L. Type the code macOS shows, once per
 browser launch. Click a login to fill it, or Copy for the password. macOS may
-ask for Touch ID.
+ask for Touch ID. A password it has read is remembered for 5 minutes so a retry
+doesn't prompt again; change or disable that in the extension's options.
 
 ## Browsers
 
@@ -45,14 +46,17 @@ to browsers on Apple's allowlist (Chrome, Brave, Edge, Vivaldi, Arc, Firefox and
 others). The manifest carries Apple's public `key`, so Chrome gives an unpacked
 copy the same ID. This also means it can't go on the Chrome Web Store.
 
-## Layout
+## Testing
 
-- `src/apple/srp.ts` SRP-6a session and AES-GCM framing
-- `src/apple/client.ts` native messaging client
-- `src/background.ts` service worker that owns the connection
-- `src/popup/` popup UI
-- `src/content.ts` form filling
-- `e2e/pair.mjs` Playwright run against Brave
+```sh
+npm run test:e2e
+```
+
+Opens Brave with a fresh profile, waits for you to type the pairing code into
+the popup tab, then lists logins and fills a local form. Set `BROWSER` to
+another executable (Edge, Vivaldi, Arc). Chrome can't be used: it ignores
+`--load-extension` since 137, and Playwright's own Chromium is unsigned so
+Apple's helper refuses it.
 
 ## Not yet
 
