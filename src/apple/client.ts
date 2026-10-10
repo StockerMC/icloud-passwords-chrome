@@ -132,6 +132,22 @@ export class AppleClient {
     return { username: entry.USR as string, password: entry.PWD as string, sites: (entry.sites as string[]) ?? [] };
   }
 
+  // The helper decides whether this is new or changed and shows its own
+  // save sheet. The reply carries nothing, and a slow one is not an error.
+  async save(tabId: number, hostname: string, username: string, password: string) {
+    const session = this.session;
+    if (!session?.paired) throw new HelperError("Not paired");
+    const body = { ACT: Action.MaybeAdd, URL: "", USR: "", PWD: "", NURL: hostname, NUSR: username, NPWD: password };
+    const smsg = JSON.stringify({ TID: session.tid, SDATA: await session.encrypt(utf8(JSON.stringify(body))) });
+    await this.send(
+      Command.SetPassword,
+      { tabId, frameId: 0, payload: JSON.stringify({ QID: "CmdNewAccount4URL", SMSG: smsg }) },
+      3000,
+    ).catch((e) => {
+      if (!(e instanceof HelperError && e.message === "Helper did not respond")) throw e;
+    });
+  }
+
   close() {
     if (!this.port) return;
     try {

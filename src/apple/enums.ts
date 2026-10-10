@@ -5,6 +5,7 @@ export const enum Command {
   Handshake = 2,
   GetLoginNamesForUrl = 4,
   GetPasswordForLoginName = 5,
+  SetPassword = 6,
   TabEvent = 8,
   LaunchPasswordsApp = 13,
   GetCapabilities = 14,
@@ -26,6 +27,7 @@ export const enum Protocol {
 
 export const enum Action {
   Search = 2,
+  MaybeAdd = 4,
   GhostSearch = 5,
 }
 
