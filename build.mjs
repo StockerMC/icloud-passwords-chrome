@@ -7,6 +7,7 @@ mkdirSync("dist");
 cpSync("manifest.json", "dist/manifest.json");
 cpSync("src/popup/popup.html", "dist/popup.html");
 cpSync("src/popup/popup.css", "dist/popup.css");
+cpSync("src/options/options.html", "dist/options.html");
 cpSync("icons", "dist/icons", { recursive: true });
 
 const opts = {
@@ -14,6 +15,7 @@ const opts = {
     { in: "src/background.ts", out: "background" },
     { in: "src/content.ts", out: "content" },
     { in: "src/popup/popup.ts", out: "popup" },
+    { in: "src/options/options.ts", out: "options" },
   ],
   outdir: "dist",
   bundle: true,
