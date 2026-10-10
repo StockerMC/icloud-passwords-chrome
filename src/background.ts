@@ -1,17 +1,31 @@
 import { AppleClient, HelperError } from "./apple/client";
+import type { Credential, LoginName } from "./apple/enums";
 import type { Request, Response, State } from "./messages";
 import type { FillRequest, FillResult } from "./content";
+import { getSettings } from "./settings";
 
 const CODE_TTL_MS = 2 * 60_000;
-const KEEPALIVE = "keepalive";
 
 let client = new AppleClient();
 let codeRequestedAt = 0;
+const recent = new Map<string, { credential: Credential; at: number }>();
 
 client.onDisconnect = () => {
   codeRequestedAt = 0;
-  chrome.action.setBadgeText({ text: "" });
+  recent.clear();
 };
+
+async function credential(tabId: number, url: string, login: LoginName) {
+  const host = hostname(url);
+  const key = `${host}\0${login.username}`;
+  // Touch ID is asked per password read; remembering it spares the prompt on a retry.
+  const ttl = (await getSettings()).rememberMinutes * 60_000;
+  const hit = recent.get(key);
+  if (hit && Date.now() - hit.at < ttl) return hit.credential;
+  const fresh = await client.password(tabId, host, login);
+  recent.set(key, { credential: fresh, at: Date.now() });
+  return fresh;
+}
 
 function state(): State {
   if (client.paired) return "ready";
@@ -37,19 +51,18 @@ async function handle(req: Request, sender: chrome.runtime.MessageSender): Promi
     case "PAIR_FINISH":
       await client.submitCode(req.pin);
       codeRequestedAt = 0;
-      chrome.alarms.create(KEEPALIVE, { periodInMinutes: 0.5 });
       return { ok: true, state: "ready" };
 
     case "LOGINS":
       return { ok: true, logins: await client.loginNames(req.tabId, hostname(req.url)) };
 
     case "PASSWORD":
-      return { ok: true, credential: await client.password(req.tabId, hostname(req.url), req.login) };
+      return { ok: true, credential: await credential(req.tabId, req.url, req.login) };
 
     case "FILL": {
       const tab = await chrome.tabs.get(req.tabId);
       if (tab.url !== req.url) throw new Error("Tab navigated away");
-      const { username, password } = await client.password(req.tabId, hostname(req.url), req.login);
+      const { username, password } = await credential(req.tabId, req.url, req.login);
       const result = await chrome.tabs.sendMessage<FillRequest, FillResult | { error: string }>(
         req.tabId,
         { type: "FILL", username, password },
@@ -62,7 +75,7 @@ async function handle(req: Request, sender: chrome.runtime.MessageSender): Promi
     case "LOCK":
       client.close();
       codeRequestedAt = 0;
-      chrome.alarms.clear(KEEPALIVE);
+      recent.clear();
       return { ok: true, state: "disconnected" };
   }
 }
@@ -82,8 +95,5 @@ chrome.runtime.onMessage.addListener((req: Request, sender, respond: (r: Respons
   return true;
 });
 
-// An open native port already keeps the worker alive, the alarm is a backstop
-// so an idle worker doesn't drop the session and force a re-pair.
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === KEEPALIVE && !client.paired) chrome.alarms.clear(KEEPALIVE);
-});
+// The open native port keeps this worker alive (Chrome 105+), so the session
+// survives idle time without any keep-alive tricks.

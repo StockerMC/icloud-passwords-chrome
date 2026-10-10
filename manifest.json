@@ -9,7 +9,6 @@
     "nativeMessaging",
     "activeTab",
     "tabs",
-    "alarms",
     "clipboardWrite"
   ],
   "host_permissions": [
