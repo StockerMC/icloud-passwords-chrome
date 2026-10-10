@@ -26,6 +26,18 @@ Click the toolbar icon or press ⌘⇧L. Type the code macOS shows, once per
 browser launch. Click a login to fill it, or Copy for the password. macOS may
 ask for Touch ID.
 
+## Browsers
+
+Works in Chrome, Brave, Edge, Vivaldi, Arc, Opera and ungoogled-chromium.
+Unsigned Chromium builds don't work: the helper refuses to start under a
+browser that isn't signed and on Apple's allowlist. Browsers other than
+Chrome and Brave need Apple's host manifest linked into their own directory:
+
+```sh
+ln -s "/Library/Google/Chrome/NativeMessagingHosts/com.apple.passwordmanager.json" \
+  "/Library/Application Support/Chromium/NativeMessagingHosts/"
+```
+
 ## Why the fixed ID
 
 Apple's helper only talks to Apple's extension IDs, and since macOS 15.4 only
