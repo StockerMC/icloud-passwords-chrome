@@ -322,7 +322,11 @@ function offerSave(username: string, hostname: string) {
   const later = document.createElement("button");
   later.className = "quiet";
   later.textContent = "Not now";
-  save.addEventListener("click", () => (send({ type: "SAVE_PENDING", accept: true }), bar.hide()));
+  save.addEventListener("click", async () => {
+    bar.hide();
+    const r = await send<Response>({ type: "SAVE_PENDING", accept: true });
+    if (!r.ok) console.warn("iCloud Passwords: save failed:", r.error);
+  });
   later.addEventListener("click", () => (send({ type: "SAVE_PENDING", accept: false }), bar.hide()));
   bar.box.replaceChildren(text, save, later);
   bar.show();

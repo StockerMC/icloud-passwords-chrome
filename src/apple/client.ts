@@ -28,6 +28,8 @@ export class AppleClient {
   private session?: SrpSession;
   private pending = new Map<number, Pending>();
   private _capabilities?: Capabilities;
+  // Replies carry no request id, so requests of one command run one at a time.
+  private queues = new Map<number, Promise<unknown>>();
   onDisconnect?: (reason: string) => void;
 
   get connected() {
@@ -133,17 +135,14 @@ export class AppleClient {
   }
 
   // The helper decides whether this is new or changed and shows its own
-  // save sheet. The reply carries nothing, and a slow one is not an error.
+  // save sheet, and only replies once that is dismissed.
   async save(tabId: number, hostname: string, username: string, password: string) {
     const session = this.session;
     if (!session?.paired) throw new HelperError("Not paired");
     const body = { ACT: Action.MaybeAdd, URL: "", USR: "", PWD: "", NURL: hostname, NUSR: username, NPWD: password };
-    const smsg = JSON.stringify({ TID: session.tid, SDATA: await session.encrypt(utf8(JSON.stringify(body))) });
-    await this.send(
-      Command.SetPassword,
-      { tabId, frameId: 0, payload: JSON.stringify({ QID: "CmdNewAccount4URL", SMSG: smsg }) },
-      3000,
-    ).catch((e) => {
+    try {
+      await this.query(Command.SetPassword, "CmdNewAccount4URL", { tabId, frameId: 0 }, body, 20_000);
+    } catch (e) {
       if (!(e instanceof HelperError && e.message === "Helper did not respond")) throw e;
     });
   }
@@ -200,7 +199,7 @@ export class AppleClient {
   private send(cmd: Command, body: object, timeout?: number) {
     const port = this.port;
     if (!port) return Promise.reject(new HelperError("Not connected"));
-    if (this.pending.has(cmd)) return Promise.reject(new HelperError("Request already in flight"));
+    if (reply.payload === undefined) return [];
     return new Promise<Message>((resolve, reject) => {
       const p: Pending = { resolve, reject };
       if (timeout) {
@@ -217,6 +216,13 @@ export class AppleClient {
 
 function pakeEncode(obj: object) {
   return btoa(String.fromCharCode(...utf8(JSON.stringify(obj))));
+    const previous = this.queues.get(cmd) ?? Promise.resolve();
+    const run = previous.then(() => this.sendNow(cmd, body, timeout), () => this.sendNow(cmd, body, timeout));
+    this.queues.set(cmd, run.catch(() => {}));
+    return run;
+  }
+
+  private sendNow(cmd: Command, body: object, timeout?: number) {
 }
 
 function base64Bytes(s: string) {
