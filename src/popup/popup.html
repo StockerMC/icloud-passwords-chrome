@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <span class="title">iCloud Passwords for Chrome</span>
+    <button id="lock" class="icon" title="Lock" hidden>Lock</button>
+  </header>
+
+  <section id="view-loading" class="view">
+    <p class="muted">Connecting to Passwords…</p>
+  </section>
+
+  <section id="view-pair" class="view" hidden>
+    <p>Enter the 6-digit code shown by macOS.</p>
+    <form id="pair-form">
+      <input id="pin" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autocomplete="one-time-code" autofocus />
+      <button type="submit">Pair</button>
+    </form>
+    <button id="new-code" class="link">Request a new code</button>
+  </section>
+
+  <section id="view-logins" class="view" hidden>
+    <p id="site" class="muted"></p>
+    <ul id="logins"></ul>
+    <p id="empty" class="muted" hidden>No saved passwords for this site.</p>
+  </section>
+
+  <section id="view-error" class="view" hidden>
+    <p id="error-text" class="error"></p>
+    <button id="retry">Try again</button>
+  </section>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
