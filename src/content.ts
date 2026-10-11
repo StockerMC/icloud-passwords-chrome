@@ -13,6 +13,7 @@ type Kind = "username" | "password" | "newPassword" | "otp";
 const USERNAME_HINTS = ["email", "mail", "user", "login", "account", "identifier", "phone"];
 const NEW_PASSWORD_HINTS = ["new", "confirm", "create", "signup", "sign-up", "register", "repeat", "verify"];
 const OTP_HINTS = ["otp", "one-time", "onetime", "totp", "verification", "2fa", "mfa", "passcode", "security code"];
+const OTHER_CODE_HINTS = ["zip", "postal", "promo", "discount", "coupon", "voucher", "gift", "referral", "invite", "country", "area", "dial", "product", "barcode", "qr"];
 const ATTRS = ["autocomplete", "name", "id", "placeholder", "aria-label"];
 
 function attrs(input: Input) {
@@ -68,8 +69,9 @@ function classify(el: EventTarget | null): Kind | null {
 function isOtp(input: Input) {
   if (input.type === "password") return false;
   if (input.autocomplete === "one-time-code" || hinted(input, OTP_HINTS)) return true;
+  if (hinted(input, ["code"])) return !hinted(input, OTHER_CODE_HINTS);
   const short = input.maxLength > 0 && input.maxLength <= 8;
-  return (short || input.inputMode === "numeric") && hinted(input, ["code", "pin"]);
+  return (short || input.inputMode === "numeric") && hinted(input, ["pin"]);
 }
 
 // Sites that split the code into one box per digit.
