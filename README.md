@@ -15,11 +15,13 @@ npm run build
 2. Disable Apple's iCloud Passwords extension if it's installed.
 3. Click the toolbar icon (⌘⇧L) and type the code macOS shows.
 
-Focus a login field to get a menu of saved logins. Sign-up forms offer a strong
-password. Verification-code fields offer codes from the Passwords app and codes
-that just arrived in Messages. After logging in with a new login, a bar
-offers to save it through Apple's own save sheet. The popup lists logins, copies
-passwords and generates new ones.
+## Features
+
+- Login fields get a menu of saved logins.
+- Sign-up forms offer a strong password.
+- Verification-code fields offer codes from the Passwords app and Messages.
+- After a login with a new password, a bar offers to save it.
+- The popup lists logins, copies passwords and generates new ones.
 
 Pairing repeats once per browser launch. Touch ID prompts come from macOS; turn
 them off under System Settings → Touch ID & Password → Password AutoFill, or
@@ -27,14 +29,16 @@ let the extension remember a read password for a few minutes (see Options).
 
 ## Browsers
 
-Chrome, Brave, Edge, Vivaldi, Arc, Opera. Unsigned Chromium builds don't work:
-Apple's helper only runs under browsers it allowlists. Browsers other than
-Chrome and Brave need the host manifest linked into their own directory, e.g.
+Chrome and Brave work as is. Edge, Vivaldi, Arc and Opera need the helper's
+manifest linked into their own directory:
 
 ```sh
 ln -s /Library/Google/Chrome/NativeMessagingHosts/com.apple.passwordmanager.json \
   "/Library/Application Support/Chromium/NativeMessagingHosts/"
 ```
+
+Unsigned Chromium builds don't work; Apple's helper only runs under browsers it
+allowlists.
 
 ## Why the ID is fixed
 
