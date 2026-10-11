@@ -24,8 +24,7 @@ npm run build
 - The popup lists logins, copies passwords and generates new ones.
 
 Pairing repeats once per browser launch. Touch ID prompts come from macOS; turn
-them off under System Settings → Touch ID & Password → Password AutoFill, or
-let the extension remember a read password for a few minutes (see Options).
+them off under System Settings → Touch ID & Password → Password AutoFill.
 
 ## Email codes
 
@@ -57,18 +56,6 @@ allowlists.
 
 The helper only accepts Apple's extension ID, so the manifest reuses Apple's
 public key. That's why this can't be on the Chrome Web Store.
-
-## Test
-
-```sh
-npm run test:e2e
-```
-
-Opens Chrome with a fresh profile, waits for you to type the pairing code,
-then lists logins and runs the menu, generator and code field against a local
-page, and the save bar against a public test login page (the keychain won't
-store logins for localhost). Delete the test entry afterwards.
-`BROWSER=/path/to/Brave` to use another browser.
 
 ## Limitations
 
