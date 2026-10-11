@@ -252,6 +252,12 @@ async function openMenu(input: Input, kind: Kind) {
         const site = login.sites[0];
         items.push(
           row(login.username || "(no username)", site && site !== location.hostname ? site : undefined, async () => {
+            // A username-only page needs no password, so no Touch ID.
+            if (input.type !== "password" && login.username && passwordFields(scope(input)).length === 0) {
+              closeMenu();
+              setValue(input, login.username);
+              return;
+            }
             const r = await send<Response>({ type: "PAGE_CREDENTIAL", login });
             if (!r.ok) return;
             const { username, password } = (r as { credential: { username: string; password: string } }).credential;
