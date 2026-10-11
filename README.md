@@ -29,15 +29,12 @@ them off under System Settings → Touch ID & Password → Password AutoFill.
 ## Email codes
 
 Apple's helper only passes on codes from Messages, so email is read directly.
-Gmail uses the inbox feed of the account the browser is signed in to. Mail.app
-needs a small native host, which reads messages from the last ten minutes
-over AppleScript:
+Both sources are off by default; turn them on in Options (gear in the popup).
 
-```sh
-npm run install-host
-```
-
-macOS asks once to allow osascript to control Mail. Both are off by default; turn them on in Options (gear in the popup).
+- Gmail: the inbox feed of the account the browser is signed in to.
+- Mail.app: a script that asks Mail for the last ten minutes of messages.
+  Register it once with `npm run install-host`; macOS then asks once to let
+  osascript control Mail.
 
 ## Browsers
 
