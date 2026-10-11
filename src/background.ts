@@ -1,15 +1,17 @@
 import { AppleClient, HelperError } from "./apple/client";
-import type { Credential, LoginName, OneTimeCode } from "./apple/enums";
-import type { Request, Response, State } from "./messages";
+import type { Credential, LoginName } from "./apple/enums";
 import type { PageMessage } from "./content";
-import { getSettings } from "./settings";
 import { gmailCodes } from "./gmail";
 import { mailCodes } from "./mail";
+import type { Data, Request, State } from "./messages";
+import { getSettings } from "./settings";
 
 const CODE_TTL_MS = 2 * 60_000;
 const SAVE_WINDOW_MS = 60_000;
 
-let client = new AppleClient();
+// The open native port keeps this worker alive (Chrome 105+), so the session
+// survives idle time without any keep-alive tricks.
+const client = new AppleClient();
 let codeRequestedAt = 0;
 const recent = new Map<string, { credential: Credential; at: number }>();
 
@@ -37,7 +39,7 @@ client.onOneTimeCode = async () => {
 };
 
 // The frame's URL and those of its ancestors, which the helper matches codes against.
-async function frameURLs(sender: chrome.runtime.MessageSender) {
+function frameURLs(sender: chrome.runtime.MessageSender) {
   const urls = [sender.url!];
   if (sender.tab?.url && sender.tab.url !== sender.url) urls.push(sender.tab.url);
   return urls;
@@ -80,8 +82,7 @@ function recordSubmission(tabId: number, url: string, req: Extract<Request, { ty
   if (!username && earlier && Date.now() - earlier.at < 5 * 60_000) username = earlier.username;
   stageOne.delete(host);
 
-  const existing = pendingSaves.get(tabId);
-  clearTimeout(existing?.timer);
+  clearTimeout(pendingSaves.get(tabId)?.timer);
   const pending: PendingSave = { hostname: new URL(url).host, username, password: req.password, newPassword: req.newPassword, at: Date.now(), offered: false };
   // Logins that never navigate (single-page apps) get evaluated on a timer.
   pending.timer = setTimeout(() => offerSave(tabId), 2500);
@@ -118,101 +119,103 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 });
 chrome.tabs.onRemoved.addListener((tabId) => pendingSaves.delete(tabId));
 
-async function handle(req: Request, sender: chrome.runtime.MessageSender): Promise<Response> {
-  const tabId = sender.tab?.id ?? -1;
-  switch (req.type) {
-    case "STATUS":
-      return { ok: true, state: state() };
+type Sender = chrome.runtime.MessageSender;
+type Handlers = { [K in Request["type"]]: (req: Extract<Request, { type: K }>, sender: Sender) => Promise<Data<K>> };
 
-    case "PAIR_START": {
-      if (client.paired) return { ok: true, state: "ready" };
-      const fresh = Date.now() - codeRequestedAt < CODE_TTL_MS;
-      if (!fresh || req.force) {
-        await client.requestCode();
-        codeRequestedAt = Date.now();
-      }
-      return { ok: true, state: "pairing" };
+// Requests from content scripts carry the frame's own URL, which decides the site asked about.
+const handlers: Handlers = {
+  async STATUS() {
+    return { state: state() };
+  },
+
+  async PAIR_START(req) {
+    if (client.paired) return { state: "ready" };
+    const fresh = Date.now() - codeRequestedAt < CODE_TTL_MS;
+    if (!fresh || req.force) {
+      await client.requestCode();
+      codeRequestedAt = Date.now();
     }
+    return { state: "pairing" };
+  },
 
-    case "PAIR_FINISH":
-      await client.submitCode(req.pin);
-      codeRequestedAt = 0;
-      return { ok: true, state: "ready" };
+  async PAIR_FINISH(req) {
+    await client.submitCode(req.pin);
+    codeRequestedAt = 0;
+    return { state: "ready" };
+  },
 
-    case "LOGINS":
-      return { ok: true, logins: await logins(req.tabId, req.url), state: state() };
+  async LOGINS(req) {
+    return { logins: await logins(req.tabId, req.url), state: state() };
+  },
 
-    case "PASSWORD":
-      return { ok: true, credential: await credential(req.tabId, req.url, req.login) };
+  async PASSWORD(req) {
+    return { credential: await credential(req.tabId, req.url, req.login) };
+  },
 
-    case "FILL": {
-      const tab = await chrome.tabs.get(req.tabId);
-      if (tab.url !== req.url) throw new Error("Tab navigated away");
-      const { username, password } = await credential(req.tabId, req.url, req.login);
-      const msg: PageMessage = { type: "FILL", username, password };
-      const result = await chrome.tabs.sendMessage<PageMessage, { filled?: object; error?: string }>(req.tabId, msg, { frameId: 0 });
-      if (result?.error) throw new Error(result.error);
-      return { ok: true, state: state() };
-    }
+  async FILL(req) {
+    const tab = await chrome.tabs.get(req.tabId);
+    if (tab.url !== req.url) throw new Error("Tab navigated away");
+    const { username, password } = await credential(req.tabId, req.url, req.login);
+    const msg: PageMessage = { type: "FILL", username, password };
+    const result = await chrome.tabs.sendMessage<PageMessage, { error?: string }>(req.tabId, msg, { frameId: 0 });
+    if (result?.error) throw new Error(result.error);
+  },
 
-    case "LOCK":
-      client.close();
-      codeRequestedAt = 0;
-      recent.clear();
-      return { ok: true, state: "disconnected" };
+  async LOCK() {
+    client.close();
+    codeRequestedAt = 0;
+    recent.clear();
+  },
 
-    // From content scripts: the frame's own URL decides which site is asked about.
-    case "PAGE_LOGINS":
-      return { ok: true, logins: await logins(tabId, sender.url!), state: state() };
+  async PAGE_LOGINS(_req, sender) {
+    return { logins: await logins(sender.tab!.id!, sender.url!), state: state() };
+  },
 
-    case "PAGE_CREDENTIAL":
-      return { ok: true, credential: await credential(tabId, sender.url!, req.login) };
+  async PAGE_CREDENTIAL(req, sender) {
+    return { credential: await credential(sender.tab!.id!, sender.url!, req.login) };
+  },
 
-    case "SUBMITTED":
-      recordSubmission(tabId, sender.url!, req);
-      return { ok: true, state: state() };
+  async SUBMITTED(req, sender) {
+    recordSubmission(sender.tab!.id!, sender.url!, req);
+  },
 
-    case "SAVE_PENDING": {
-      const pending = pendingSaves.get(tabId);
-      pendingSaves.delete(tabId);
-      if (req.accept && pending) await client.save(tabId, pending.hostname, pending.username, pending.password);
-      return { ok: true, state: state() };
-    }
+  async SAVE_PENDING(req, sender) {
+    const tabId = sender.tab!.id!;
+    const pending = pendingSaves.get(tabId);
+    pendingSaves.delete(tabId);
+    if (req.accept && pending) await client.save(tabId, pending.hostname, pending.username, pending.password);
+  },
 
-    case "OPEN_POPUP":
-      await chrome.action.openPopup().catch(() => {});
-      return { ok: true, state: state() };
+  async OPEN_POPUP() {
+    await chrome.action.openPopup().catch(() => {});
+  },
 
-    case "PAGE_CODES": {
-      const helper = client.paired && client.capabilities?.canFillOneTimeCodes
-        ? client.oneTimeCodes(tabId, sender.frameId ?? 0, await frameURLs(sender))
-        : [];
-      const settings = await getSettings();
-      const gmail = settings.gmail ? gmailCodes() : [];
-      const mail = settings.mail ? mailCodes() : [];
-      return { ok: true, codes: (await Promise.all([helper, gmail, mail])).flat() };
-    }
+  async PAGE_CODES(_req, sender) {
+    const settings = await getSettings();
+    const helper = client.paired && client.capabilities?.canFillOneTimeCodes
+      ? client.oneTimeCodes(sender.tab!.id!, sender.frameId ?? 0, frameURLs(sender))
+      : [];
+    const gmail = settings.gmail ? gmailCodes() : [];
+    const mail = settings.mail ? mailCodes() : [];
+    return { codes: (await Promise.all([helper, gmail, mail])).flat() };
+  },
 
-    case "PAGE_CODE": {
-      if (req.entry.code) return { ok: true, code: req.entry.code };
-      const codes = await client.readOneTimeCodes(tabId, sender.frameId ?? 0, await frameURLs(sender), req.entry.username || undefined);
-      const match = codes.find((c) => c.username === req.entry.username && c.code) ?? codes.find((c) => c.code);
-      if (!match) throw new Error("No code available");
-      return { ok: true, code: match.code };
-    }
-  }
-}
+  async PAGE_CODE(req, sender) {
+    if (req.entry.code) return { code: req.entry.code };
+    const codes = await client.readOneTimeCodes(sender.tab!.id!, sender.frameId ?? 0, frameURLs(sender), req.entry.username || undefined);
+    const match = codes.find((c) => c.username === req.entry.username && c.code) ?? codes.find((c) => c.code);
+    if (!match) throw new Error("No code available");
+    return { code: match.code };
+  },
+};
 
-chrome.runtime.onMessage.addListener((req: Request, sender, respond: (r: Response) => void) => {
+chrome.runtime.onMessage.addListener((req: Request, sender, respond: (r: object) => void) => {
+  const handle = handlers[req.type] as (req: Request, sender: Sender) => Promise<object | void>;
   handle(req, sender)
+    .then((data) => respond({ ok: true, ...data }))
     .catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : String(e);
       if (!(e instanceof HelperError)) console.error(e);
-      return { ok: false, error: message } as Response;
-    })
-    .then(respond);
+      respond({ ok: false, error: e instanceof Error ? e.message : String(e) });
+    });
   return true;
 });
-
-// The open native port keeps this worker alive (Chrome 105+), so the session
-// survives idle time without any keep-alive tricks.

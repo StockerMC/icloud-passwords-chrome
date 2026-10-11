@@ -18,15 +18,23 @@ export type Request =
   | { type: "PAGE_CODES" }
   | { type: "PAGE_CODE"; entry: OneTimeCode };
 
-export type Response =
-  | { ok: true; state: State }
-  | { ok: true; logins: LoginName[]; state: State }
-  | { ok: true; credential: Credential }
-  | { ok: true; codes: OneTimeCode[] }
-  | { ok: true; code: string }
-  | { ok: true; filled: { username: boolean; password: boolean } }
-  | { ok: false; error: string };
+// What each request answers with, beyond ok. Requests not listed answer with ok alone.
+export interface Replies {
+  STATUS: { state: State };
+  PAIR_START: { state: State };
+  PAIR_FINISH: { state: State };
+  LOGINS: { logins: LoginName[]; state: State };
+  PASSWORD: { credential: Credential };
+  PAGE_LOGINS: { logins: LoginName[]; state: State };
+  PAGE_CREDENTIAL: { credential: Credential };
+  PAGE_CODES: { codes: OneTimeCode[] };
+  PAGE_CODE: { code: string };
+}
 
-export function send<T extends Response>(req: Request) {
-  return chrome.runtime.sendMessage<Request, T>(req);
+export type Data<K extends Request["type"]> = K extends keyof Replies ? Replies[K] : void;
+
+export type Reply<K extends Request["type"]> = ({ ok: true } & (K extends keyof Replies ? Replies[K] : unknown)) | { ok: false; error: string };
+
+export function send<R extends Request>(req: R): Promise<Reply<R["type"]>> {
+  return chrome.runtime.sendMessage(req);
 }

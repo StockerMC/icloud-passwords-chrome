@@ -1,6 +1,6 @@
 import type { LoginName } from "../apple/enums";
 import { generatePassword } from "../generate";
-import { send, type Response, type State } from "../messages";
+import { send } from "../messages";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const views = ["loading", "pair", "logins", "error"] as const;
@@ -24,10 +24,10 @@ async function currentTab() {
 
 async function start() {
   show("loading");
-  const res = await send<{ ok: true; state: State } | { ok: false; error: string }>({ type: "STATUS" });
+  const res = await send({ type: "STATUS" });
   if (!res.ok) return fail(res.error);
   if (res.state === "ready") return loadLogins();
-  const pair = await send<Response>({ type: "PAIR_START" });
+  const pair = await send({ type: "PAIR_START" });
   if (!pair.ok) return fail(pair.error);
   $<HTMLInputElement>("pin").value = "";
   show("pair");
@@ -44,12 +44,11 @@ async function loadLogins() {
   }
   const host = new URL(tab.url).hostname;
   $("site").textContent = host;
-  const res = await send<Response>({ type: "LOGINS", tabId: tab.id, url: tab.url });
+  const res = await send({ type: "LOGINS", tabId: tab.id, url: tab.url });
   if (!res.ok) return fail(res.error);
-  const logins = (res as { logins: LoginName[] }).logins;
-  $("logins").replaceChildren(...logins.map((login) => row(login, tab)));
+  $("logins").replaceChildren(...res.logins.map((login) => row(login, tab)));
   $("empty").textContent = "No saved passwords for this site.";
-  $("empty").hidden = logins.length > 0;
+  $("empty").hidden = res.logins.length > 0;
   show("logins");
 }
 
@@ -67,7 +66,7 @@ function row(login: LoginName, tab: { id: number; url: string }) {
 
   li.addEventListener("click", async () => {
     li.classList.add("busy");
-    const res = await send<Response>({ type: "FILL", tabId: tab.id, url: tab.url, login });
+    const res = await send({ type: "FILL", tabId: tab.id, url: tab.url, login });
     li.classList.remove("busy");
     if (!res.ok) return fail(res.error);
     window.close();
@@ -75,10 +74,10 @@ function row(login: LoginName, tab: { id: number; url: string }) {
   copy.addEventListener("click", async (e) => {
     e.stopPropagation();
     li.classList.add("busy");
-    const res = await send<Response>({ type: "PASSWORD", tabId: tab.id, url: tab.url, login });
+    const res = await send({ type: "PASSWORD", tabId: tab.id, url: tab.url, login });
     li.classList.remove("busy");
     if (!res.ok) return fail(res.error);
-    await navigator.clipboard.writeText((res as { credential: { password: string } }).credential.password);
+    await navigator.clipboard.writeText(res.credential.password);
     copy.textContent = "Copied";
     setTimeout(() => (copy.textContent = "Copy"), 1200);
   });
@@ -90,10 +89,9 @@ $("pair-form").addEventListener("submit", async (e) => {
   const pin = $<HTMLInputElement>("pin").value.replace(/\D/g, "");
   if (pin.length !== 6) return;
   show("loading");
-  const res = await send<Response>({ type: "PAIR_FINISH", pin });
+  const res = await send({ type: "PAIR_FINISH", pin });
   if (!res.ok) {
     $<HTMLInputElement>("pin").value = "";
-    $("error-text").textContent = res.error;
     return fail(res.error === "Incorrect code" ? "Incorrect code. Request a new one and try again." : res.error);
   }
   loadLogins();
@@ -105,7 +103,7 @@ $("pin").addEventListener("input", () => {
 
 $("new-code").addEventListener("click", async () => {
   show("loading");
-  const res = await send<Response>({ type: "PAIR_START", force: true });
+  const res = await send({ type: "PAIR_START", force: true });
   if (!res.ok) return fail(res.error);
   $<HTMLInputElement>("pin").value = "";
   show("pair");

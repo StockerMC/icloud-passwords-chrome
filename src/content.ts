@@ -1,121 +1,12 @@
 import type { LoginName, OneTimeCode } from "./apple/enums";
+import { classify, fill, fillCode, isNewPassword, isOtp, passwordFields, scope, setValue, usernameField, type Input, type Kind } from "./fields";
 import { generatePassword } from "./generate";
-import { send, type Response, type State } from "./messages";
+import { send } from "./messages";
 
 export type PageMessage =
   | { type: "FILL"; username: string; password: string }
   | { type: "OFFER_SAVE"; username: string; hostname: string }
   | { type: "CODE_ARRIVED" };
-
-type Input = HTMLInputElement;
-type Kind = "username" | "password" | "newPassword" | "otp";
-
-const USERNAME_HINTS = ["email", "mail", "user", "login", "account", "identifier", "phone"];
-const NEW_PASSWORD_HINTS = ["new", "confirm", "create", "signup", "sign-up", "register", "repeat", "verify"];
-const OTP_HINTS = ["otp", "one-time", "onetime", "totp", "verification", "2fa", "mfa", "passcode", "security code"];
-const OTHER_CODE_HINTS = ["zip", "postal", "promo", "discount", "coupon", "voucher", "gift", "referral", "invite", "country", "area", "dial", "product", "barcode", "qr"];
-const ATTRS = ["autocomplete", "name", "id", "placeholder", "aria-label"];
-
-function attrs(input: Input) {
-  return ATTRS.map((a) => input.getAttribute(a)?.toLowerCase() ?? "");
-}
-
-function hinted(input: Input, hints: string[]) {
-  return attrs(input).some((v) => hints.some((h) => v.includes(h)));
-}
-
-function visible(el: HTMLElement) {
-  if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
-  const r = el.getBoundingClientRect();
-  return r.width >= 20 && r.height >= 10 && r.bottom > 0 && r.right > 0;
-}
-
-function scope(input: Input): ParentNode {
-  return input.form ?? (input.getRootNode() as ParentNode);
-}
-
-function inputs(root: ParentNode) {
-  return [...root.querySelectorAll<Input>("input")];
-}
-
-function passwordFields(root: ParentNode) {
-  return inputs(root).filter((i) => i.type === "password" && visible(i));
-}
-
-function isNewPassword(input: Input) {
-  if (input.autocomplete === "new-password") return true;
-  if (input.autocomplete === "current-password") return false;
-  return hinted(input, NEW_PASSWORD_HINTS) || passwordFields(scope(input)).length >= 2;
-}
-
-function isUsernameLike(input: Input) {
-  if (!["text", "email", "tel", ""].includes(input.type)) return false;
-  if (input.autocomplete === "username" || input.autocomplete === "email") return true;
-  return hinted(input, USERNAME_HINTS);
-}
-
-function classify(el: EventTarget | null): Kind | null {
-  if (!(el instanceof HTMLInputElement) || el.readOnly || el.disabled || !visible(el)) return null;
-  if (isOtp(el)) return "otp";
-  if (el.type === "password") return isNewPassword(el) ? "newPassword" : "password";
-  if (el.type === "search" || el.getAttribute("role") === "searchbox") return null;
-  if (!isUsernameLike(el)) return null;
-  // A lone username field is a two-step login; one next to a password field is a login form.
-  return passwordFields(scope(el)).length > 0 || el.autocomplete === "username" || el.autocomplete === "email" || hinted(el, ["email", "user", "login"])
-    ? "username"
-    : null;
-}
-
-function isOtp(input: Input) {
-  if (input.type === "password") return false;
-  if (input.autocomplete === "one-time-code" || hinted(input, OTP_HINTS)) return true;
-  if (hinted(input, ["code"])) return !hinted(input, OTHER_CODE_HINTS);
-  const short = input.maxLength > 0 && input.maxLength <= 8;
-  return (short || input.inputMode === "numeric") && hinted(input, ["pin"]);
-}
-
-// Sites that split the code into one box per digit.
-function digitBoxes(input: Input) {
-  const boxes = inputs(scope(input)).filter((i) => i.maxLength === 1 && visible(i) && !["password", "hidden"].includes(i.type));
-  return boxes.length >= 4 && boxes.length <= 8 && boxes.includes(input) ? boxes : null;
-}
-
-function fillCode(input: Input, code: string) {
-  const boxes = digitBoxes(input);
-  if (!boxes) return setValue(input, code);
-  [...code].forEach((ch, i) => boxes[i] && setValue(boxes[i], ch));
-}
-
-function usernameField(root: ParentNode, before?: Input) {
-  const all = inputs(root);
-  const end = before ? all.indexOf(before) : all.length;
-  const candidates = all.slice(0, end).filter(visible);
-  return candidates.reverse().find(isUsernameLike) ?? candidates.reverse().find((i) => ["text", "email", ""].includes(i.type)) ?? null;
-}
-
-// React, Vue and Angular all watch different things, so set the value through
-// the native setter and dispatch the full event set.
-function setValue(input: Input, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  input.focus();
-  setter ? setter.call(input, value) : (input.value = value);
-  input.dispatchEvent(new InputEvent("input", { bubbles: true, data: value, inputType: "insertText" }));
-  input.dispatchEvent(new Event("change", { bubbles: true }));
-  input.blur();
-}
-
-function fill(anchor: Input | null, username: string, password: string) {
-  const root = anchor ? scope(anchor) : document;
-  const passwords = passwordFields(root);
-  const pw = anchor?.type === "password" ? anchor : passwords[0] ?? null;
-  const user = anchor && anchor.type !== "password" ? anchor : usernameField(root, pw ?? undefined);
-  if (!pw && !user) return { error: "No login fields on this page" };
-  if (user && username) setValue(user, username);
-  if (pw) setValue(pw, password);
-  return { filled: { username: !!user, password: !!pw } };
-}
-
-// --- in-page UI -------------------------------------------------------------
 
 const CSS = `
 :host { all: initial; }
@@ -165,10 +56,9 @@ class Panel {
 }
 
 const menu = new Panel("menu");
+const bar = new Panel("bar");
 let anchor: Input | null = null;
 let dismissed: Input | null = null;
-// Codes usually arrive after the field is focused, so keep looking for a while.
-let codePoll: { input: Input; until: number; timer: number; last: string } | null = null;
 
 function positionMenu() {
   if (!anchor) return;
@@ -210,67 +100,12 @@ function muted(text: string) {
 async function openMenu(input: Input, kind: Kind) {
   anchor = input;
   menu.box.replaceChildren();
-  const items: HTMLElement[] = [];
-
-  if (kind === "otp") {
-    const res = await send<{ ok: true; codes: OneTimeCode[] } | { ok: false; error: string }>({ type: "PAGE_CODES" });
-    if (anchor !== input) return;
-    if (res.ok && !res.codes.some((c) => c.code)) pollCodes(input, res.codes);
-    if (!res.ok) items.push(muted(res.error));
-    else if (res.codes.length === 0) {
-      closeMenu();
-      return;
-    } else {
-      for (const entry of res.codes) {
-        const from = entry.source === "totp" ? entry.username || entry.domain : entry.source ? `From ${entry.source}` : entry.domain;
-        items.push(
-          row(entry.code || "Verification code", from || undefined, async () => {
-            const r = await send<{ ok: true; code: string } | { ok: false; error: string }>({ type: "PAGE_CODE", entry });
-            if (!r.ok) return;
-            stopCodePoll();
-            closeMenu();
-            fillCode(input, r.code);
-          }),
-        );
-      }
-    }
-  } else if (kind === "newPassword") {
-    items.push(
-      row("Use strong password", undefined, () => {
-        const password = generatePassword();
-        for (const pw of passwordFields(scope(input))) setValue(pw, password);
-        closeMenu();
-      }),
-    );
-  } else {
-    const res = await send<{ ok: true; logins: LoginName[]; state: State } | { ok: false; error: string }>({ type: "PAGE_LOGINS" });
-    if (anchor !== input) return;
-    if (!res.ok) items.push(muted(res.error));
-    else if (res.state !== "ready") {
-      items.push(row("Pair with iCloud Passwords…", undefined, () => (send({ type: "OPEN_POPUP" }), closeMenu())));
-    } else if (res.logins.length === 0) items.push(muted(`No saved passwords for ${location.hostname}`));
-    else {
-      for (const login of res.logins) {
-        const site = login.sites[0];
-        items.push(
-          row(login.username || "(no username)", site && site !== location.hostname ? site : undefined, async () => {
-            // A username-only page needs no password, so no Touch ID.
-            if (input.type !== "password" && login.username && passwordFields(scope(input)).length === 0) {
-              closeMenu();
-              setValue(input, login.username);
-              return;
-            }
-            const r = await send<Response>({ type: "PAGE_CREDENTIAL", login });
-            if (!r.ok) return;
-            const { username, password } = (r as { credential: { username: string; password: string } }).credential;
-            closeMenu();
-            fill(input, username, password);
-          }),
-        );
-      }
-    }
+  const items = await (kind === "otp" ? codeItems(input) : kind === "newPassword" ? [generateItem(input)] : loginItems(input));
+  if (anchor !== input) return;
+  if (!items) {
+    closeMenu();
+    return;
   }
-
   menu.box.append(...items);
   positionMenu();
   menu.show();
@@ -281,19 +116,82 @@ function closeMenu() {
   anchor = null;
 }
 
+// Null means there is nothing to show, so the menu stays closed.
+async function codeItems(input: Input): Promise<HTMLElement[] | null> {
+  const res = await send({ type: "PAGE_CODES" });
+  if (!res.ok) return [muted(res.error)];
+  if (!res.codes.some((c) => c.code)) pollCodes(input, res.codes);
+  if (res.codes.length === 0) return null;
+  return res.codes.map((entry) => row(entry.code || "Verification code", codeSource(entry), () => useCode(input, entry)));
+}
+
+function codeSource(entry: OneTimeCode) {
+  if (entry.source === "totp") return entry.username || entry.domain;
+  return entry.source ? `From ${entry.source}` : entry.domain;
+}
+
+async function useCode(input: Input, entry: OneTimeCode) {
+  const res = await send({ type: "PAGE_CODE", entry });
+  if (!res.ok) return;
+  stopCodePoll();
+  closeMenu();
+  fillCode(input, res.code);
+}
+
+function generateItem(input: Input) {
+  return row("Use strong password", undefined, () => {
+    const password = generatePassword();
+    for (const pw of passwordFields(scope(input))) setValue(pw, password);
+    closeMenu();
+  });
+}
+
+async function loginItems(input: Input) {
+  const res = await send({ type: "PAGE_LOGINS" });
+  if (!res.ok) return [muted(res.error)];
+  if (res.state !== "ready") {
+    return [row("Pair with iCloud Passwords…", undefined, () => {
+      send({ type: "OPEN_POPUP" });
+      closeMenu();
+    })];
+  }
+  if (res.logins.length === 0) return [muted(`No saved passwords for ${location.hostname}`)];
+  return res.logins.map((login) => {
+    const site = login.sites[0];
+    return row(login.username || "(no username)", site && site !== location.hostname ? site : undefined, () => useLogin(input, login));
+  });
+}
+
+async function useLogin(input: Input, login: LoginName) {
+  // A username-only page needs no password, so no Touch ID.
+  if (input.type !== "password" && login.username && passwordFields(scope(input)).length === 0) {
+    closeMenu();
+    setValue(input, login.username);
+    return;
+  }
+  const res = await send({ type: "PAGE_CREDENTIAL", login });
+  if (!res.ok) return;
+  closeMenu();
+  fill(input, res.credential.username, res.credential.password);
+}
+
+// Codes usually arrive after the field is focused, so keep looking for a while.
+let codePoll: { input: Input; until: number; timer: number; last: string } | null = null;
+
 function pollCodes(input: Input, codes: OneTimeCode[]) {
   if (codePoll?.input === input) return;
   stopCodePoll();
-  const timer = window.setInterval(async () => {
-    if (document.activeElement !== input || Date.now() > codePoll!.until) return stopCodePoll();
-    const res = await send<{ ok: true; codes: OneTimeCode[] } | { ok: false; error: string }>({ type: "PAGE_CODES" });
-    if (!res.ok || !codePoll) return;
+  const poll = { input, until: Date.now() + 2 * 60_000, timer: 0, last: JSON.stringify(codes) };
+  poll.timer = window.setInterval(async () => {
+    if (document.activeElement !== input || Date.now() > poll.until) return stopCodePoll();
+    const res = await send({ type: "PAGE_CODES" });
+    if (!res.ok || codePoll !== poll) return;
     const now = JSON.stringify(res.codes);
-    if (now === codePoll.last) return;
-    codePoll.last = now;
+    if (now === poll.last) return;
+    poll.last = now;
     openMenu(input, "otp");
   }, 4000);
-  codePoll = { input, until: Date.now() + 2 * 60_000, timer, last: JSON.stringify(codes) };
+  codePoll = poll;
 }
 
 function stopCodePoll() {
@@ -342,8 +240,7 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener("scroll", positionMenu, true);
 window.addEventListener("resize", positionMenu);
 
-// --- capturing submissions --------------------------------------------------
-
+// Submitted logins go to the background, which decides whether to offer saving.
 let lastSubmission = { key: "", at: 0 };
 
 function reportSubmission(root: ParentNode) {
@@ -380,10 +277,6 @@ window.addEventListener("pagehide", () => {
   if (passwordFields(document).some((p) => p.value)) reportSubmission(document);
 });
 
-// --- save bar ---------------------------------------------------------------
-
-const bar = new Panel("bar");
-
 function offerSave(username: string, hostname: string) {
   const text = document.createElement("span");
   text.className = "text";
@@ -397,21 +290,34 @@ function offerSave(username: string, hostname: string) {
   later.textContent = "Not now";
   save.addEventListener("click", async () => {
     bar.hide();
-    const r = await send<Response>({ type: "SAVE_PENDING", accept: true });
-    if (!r.ok) console.warn("iCloud Passwords: save failed:", r.error);
+    const res = await send({ type: "SAVE_PENDING", accept: true });
+    if (!res.ok) console.warn("iCloud Passwords: save failed:", res.error);
   });
-  later.addEventListener("click", () => (send({ type: "SAVE_PENDING", accept: false }), bar.hide()));
+  later.addEventListener("click", () => {
+    send({ type: "SAVE_PENDING", accept: false });
+    bar.hide();
+  });
   bar.box.replaceChildren(text, save, later);
   bar.show();
   setTimeout(() => bar.hide(), 30_000);
 }
 
 chrome.runtime.onMessage.addListener((msg: PageMessage, _sender, respond: (r: object) => void) => {
-  if (msg.type === "FILL") respond(fill(document.activeElement instanceof HTMLInputElement ? document.activeElement : null, msg.username, msg.password));
-  else if (msg.type === "OFFER_SAVE") (offerSave(msg.username, msg.hostname), respond({ ok: true }));
-  else if (msg.type === "CODE_ARRIVED") {
-    const active = document.activeElement;
-    if (active instanceof HTMLInputElement && isOtp(active)) openMenu(active, "otp");
-    respond({ ok: true });
+  switch (msg.type) {
+    case "FILL": {
+      const active = document.activeElement;
+      respond(fill(active instanceof HTMLInputElement ? active : null, msg.username, msg.password));
+      break;
+    }
+    case "OFFER_SAVE":
+      offerSave(msg.username, msg.hostname);
+      respond({ ok: true });
+      break;
+    case "CODE_ARRIVED": {
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement && isOtp(active)) openMenu(active, "otp");
+      respond({ ok: true });
+      break;
+    }
   }
 });
