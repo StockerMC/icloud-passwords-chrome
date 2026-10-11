@@ -11,8 +11,8 @@ npm run build
 
 1. Open the browser's extensions page (`chrome://extensions`, `brave://extensions`),
    enable Developer mode, Load unpacked, pick `dist/`.
-2. Disable Apple's iCloud Passwords extension if it's installed.
-3. Click the toolbar icon (⌘⇧L) and type the code macOS shows.
+2. Click the toolbar icon (⌘⇧L) and type the code macOS shows. This repeats
+   once per browser launch.
 
 ## Features
 
@@ -23,8 +23,8 @@ npm run build
 - After a login with a new password, a bar offers to save it.
 - The popup lists logins, copies passwords and generates new ones.
 
-Pairing repeats once per browser launch. Touch ID prompts come from macOS; turn
-them off under System Settings → Touch ID & Password → Password AutoFill.
+Touch ID prompts come from macOS; turn them off under System Settings →
+Touch ID & Password → Password AutoFill.
 
 ## Email codes
 
