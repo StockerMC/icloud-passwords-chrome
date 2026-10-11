@@ -19,7 +19,8 @@ npm run build
 
 - Login fields get a menu of saved logins.
 - Sign-up forms offer a strong password.
-- Verification-code fields offer codes from the Passwords app and Messages.
+- Verification-code fields offer codes from the Passwords app and Messages,
+  and from Gmail if turned on in Options.
 - After a login with a new password, a bar offers to save it.
 - The popup lists logins, copies passwords and generates new ones.
 

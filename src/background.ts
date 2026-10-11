@@ -3,6 +3,7 @@ import type { Credential, LoginName, OneTimeCode } from "./apple/enums";
 import type { Request, Response, State } from "./messages";
 import type { PageMessage } from "./content";
 import { getSettings } from "./settings";
+import { gmailCodes } from "./gmail";
 
 const CODE_TTL_MS = 2 * 60_000;
 const SAVE_WINDOW_MS = 60_000;
@@ -181,9 +182,13 @@ async function handle(req: Request, sender: chrome.runtime.MessageSender): Promi
       await chrome.action.openPopup().catch(() => {});
       return { ok: true, state: state() };
 
-    case "PAGE_CODES":
-      if (!client.paired || !client.capabilities?.canFillOneTimeCodes) return { ok: true, codes: [] };
-      return { ok: true, codes: await client.oneTimeCodes(tabId, sender.frameId ?? 0, await frameURLs(sender)) };
+    case "PAGE_CODES": {
+      const helper = client.paired && client.capabilities?.canFillOneTimeCodes
+        ? client.oneTimeCodes(tabId, sender.frameId ?? 0, await frameURLs(sender))
+        : [];
+      const gmail = (await getSettings()).gmail ? gmailCodes() : [];
+      return { ok: true, codes: (await Promise.all([helper, gmail])).flat() };
+    }
 
     case "PAGE_CODE": {
       if (req.entry.code) return { ok: true, code: req.entry.code };
