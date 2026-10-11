@@ -99,6 +99,10 @@ $("pair-form").addEventListener("submit", async (e) => {
   loadLogins();
 });
 
+$("pin").addEventListener("input", () => {
+  if ($<HTMLInputElement>("pin").value.replace(/\D/g, "").length === 6) $<HTMLFormElement>("pair-form").requestSubmit();
+});
+
 $("new-code").addEventListener("click", async () => {
   show("loading");
   const res = await send<Response>({ type: "PAIR_START", force: true });
