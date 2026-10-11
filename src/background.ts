@@ -101,6 +101,13 @@ async function offerSave(tabId: number) {
   chrome.tabs.sendMessage(tabId, msg, { frameId: 0 }).catch(() => pendingSaves.delete(tabId));
 }
 
+// Tabs open before the install have no content script yet.
+chrome.runtime.onInstalled.addListener(async () => {
+  for (const tab of await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] })) {
+    chrome.scripting.executeScript({ target: { tabId: tab.id!, allFrames: true }, files: ["content.js"] }).catch(() => {});
+  }
+});
+
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   const pending = pendingSaves.get(tabId);
   if (!pending || info.status !== "complete") return;

@@ -9,6 +9,7 @@
     "nativeMessaging",
     "activeTab",
     "tabs",
+    "scripting",
     "storage",
     "clipboardWrite"
   ],
