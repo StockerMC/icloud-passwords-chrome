@@ -49,14 +49,10 @@ ln -s /Library/Google/Chrome/NativeMessagingHosts/com.apple.passwordmanager.json
 Unsigned Chromium builds don't work; Apple's helper only runs under browsers it
 allowlists.
 
-## Why the ID is fixed
-
-The helper only accepts Apple's extension ID, so the manifest reuses Apple's
-public key. That's why this can't be on the Chrome Web Store.
-
 ## Limitations
 
-Windows isn't currently supported.
+Windows isn't currently supported. Not on the Chrome Web Store: the helper
+only talks to Apple's extension ID, so the manifest reuses Apple's key.
 
 ---
 
