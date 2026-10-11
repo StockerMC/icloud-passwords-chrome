@@ -51,8 +51,9 @@ allowlists.
 
 ## Limitations
 
-Windows isn't currently supported. Not on the Chrome Web Store: the helper
-only talks to Apple's extension ID, so the manifest reuses Apple's key.
+- Windows isn't currently supported.
+- It's not on the Chrome Web Store because the helper only talks to Apple's
+  extension ID, so the manifest reuses Apple's key and can't be published.
 
 ---
 
