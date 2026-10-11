@@ -53,9 +53,11 @@ page, and the save bar against a public test login page (the keychain won't
 store logins for localhost). Delete the test entry afterwards.
 `BROWSER=/path/to/Brave` to use another browser.
 
-## Not yet
+## Limitations
 
-Windows.
+Windows isn't currently supported.
+
+---
 
 Protocol worked out from Apple's extension and
 [au2001/icloud-passwords-firefox](https://github.com/au2001/icloud-passwords-firefox).
