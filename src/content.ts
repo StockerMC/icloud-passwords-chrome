@@ -165,6 +165,8 @@ class Panel {
 const menu = new Panel("menu");
 let anchor: Input | null = null;
 let dismissed: Input | null = null;
+// Codes usually arrive after the field is focused, so keep looking for a while.
+let codePoll: { input: Input; until: number; timer: number; last: string } | null = null;
 
 function positionMenu() {
   if (!anchor) return;
@@ -211,6 +213,7 @@ async function openMenu(input: Input, kind: Kind) {
   if (kind === "otp") {
     const res = await send<{ ok: true; codes: OneTimeCode[] } | { ok: false; error: string }>({ type: "PAGE_CODES" });
     if (anchor !== input) return;
+    if (res.ok && !res.codes.some((c) => c.code)) pollCodes(input, res.codes);
     if (!res.ok) items.push(muted(res.error));
     else if (res.codes.length === 0) {
       closeMenu();
@@ -222,6 +225,7 @@ async function openMenu(input: Input, kind: Kind) {
           row(entry.code || "Verification code", from || undefined, async () => {
             const r = await send<{ ok: true; code: string } | { ok: false; error: string }>({ type: "PAGE_CODE", entry });
             if (!r.ok) return;
+            stopCodePoll();
             closeMenu();
             fillCode(input, r.code);
           }),
@@ -269,6 +273,26 @@ function closeMenu() {
   anchor = null;
 }
 
+function pollCodes(input: Input, codes: OneTimeCode[]) {
+  if (codePoll?.input === input) return;
+  stopCodePoll();
+  const timer = window.setInterval(async () => {
+    if (document.activeElement !== input || Date.now() > codePoll!.until) return stopCodePoll();
+    const res = await send<{ ok: true; codes: OneTimeCode[] } | { ok: false; error: string }>({ type: "PAGE_CODES" });
+    if (!res.ok || !codePoll) return;
+    const now = JSON.stringify(res.codes);
+    if (now === codePoll.last) return;
+    codePoll.last = now;
+    openMenu(input, "otp");
+  }, 4000);
+  codePoll = { input, until: Date.now() + 2 * 60_000, timer, last: JSON.stringify(codes) };
+}
+
+function stopCodePoll() {
+  if (codePoll) clearInterval(codePoll.timer);
+  codePoll = null;
+}
+
 document.addEventListener("focusin", (e) => {
   const input = e.target as Input;
   if (input === dismissed) return;
@@ -290,6 +314,7 @@ document.addEventListener("keydown", (e) => {
   if (!menu.open) return;
   if (e.key === "Escape") {
     dismissed = anchor;
+    stopCodePoll();
     closeMenu();
     return;
   }
