@@ -20,13 +20,26 @@ npm run build
 - Login fields get a menu of saved logins.
 - Sign-up forms offer a strong password.
 - Verification-code fields offer codes from the Passwords app and Messages,
-  and from Gmail if turned on in Options.
+  and from Gmail or Mail.app if turned on in Options.
 - After a login with a new password, a bar offers to save it.
 - The popup lists logins, copies passwords and generates new ones.
 
 Pairing repeats once per browser launch. Touch ID prompts come from macOS; turn
 them off under System Settings → Touch ID & Password → Password AutoFill, or
 let the extension remember a read password for a few minutes (see Options).
+
+## Email codes
+
+Apple's helper only passes on codes from Messages, so email is read directly.
+Gmail uses the inbox feed of the account the browser is signed in to. Mail.app
+needs a small native host, which reads messages from the last ten minutes
+over AppleScript:
+
+```sh
+npm run install-host
+```
+
+macOS asks once to allow osascript to control Mail. Both are off by default; turn them on in Options (gear in the popup).
 
 ## Browsers
 

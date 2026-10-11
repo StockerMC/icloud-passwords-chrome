@@ -4,6 +4,7 @@ import type { Request, Response, State } from "./messages";
 import type { PageMessage } from "./content";
 import { getSettings } from "./settings";
 import { gmailCodes } from "./gmail";
+import { mailCodes } from "./mail";
 
 const CODE_TTL_MS = 2 * 60_000;
 const SAVE_WINDOW_MS = 60_000;
@@ -186,8 +187,10 @@ async function handle(req: Request, sender: chrome.runtime.MessageSender): Promi
       const helper = client.paired && client.capabilities?.canFillOneTimeCodes
         ? client.oneTimeCodes(tabId, sender.frameId ?? 0, await frameURLs(sender))
         : [];
-      const gmail = (await getSettings()).gmail ? gmailCodes() : [];
-      return { ok: true, codes: (await Promise.all([helper, gmail])).flat() };
+      const settings = await getSettings();
+      const gmail = settings.gmail ? gmailCodes() : [];
+      const mail = settings.mail ? mailCodes() : [];
+      return { ok: true, codes: (await Promise.all([helper, gmail, mail])).flat() };
     }
 
     case "PAGE_CODE": {
