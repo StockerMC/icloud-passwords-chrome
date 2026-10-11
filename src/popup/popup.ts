@@ -118,6 +118,7 @@ $("generate").addEventListener("click", async () => {
 });
 
 $("retry").addEventListener("click", start);
+$("options").addEventListener("click", () => chrome.runtime.openOptionsPage());
 $("lock").addEventListener("click", async () => {
   await send({ type: "LOCK" });
   start();
