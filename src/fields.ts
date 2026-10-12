@@ -95,6 +95,19 @@ export function setValue(input: Input, value: string) {
   input.blur();
 }
 
+// Sites wire sign-in to a button click, a form submit or Enter, so try in that order.
+export function submitLogin(input: Input) {
+  const root = scope(input);
+  const button = [...root.querySelectorAll<HTMLElement>("button:not([type=button]), input[type=submit]")].find(visible);
+  if (button) return button.click();
+  if (input.form) return input.form.requestSubmit();
+  const target = passwordFields(root)[0] ?? input;
+  target.focus();
+  for (const type of ["keydown", "keypress", "keyup"]) {
+    target.dispatchEvent(new KeyboardEvent(type, { key: "Enter", code: "Enter", keyCode: 13, bubbles: true }));
+  }
+}
+
 export function fill(anchor: Input | null, username: string, password: string) {
   const root = anchor ? scope(anchor) : document;
   const pw = anchor?.type === "password" ? anchor : passwordFields(root)[0] ?? null;

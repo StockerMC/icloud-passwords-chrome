@@ -1,7 +1,8 @@
 import type { LoginName, OneTimeCode } from "./apple/enums";
-import { classify, fill, fillCode, isNewPassword, isOtp, passwordFields, scope, setValue, usernameField, type Input, type Kind } from "./fields";
+import { classify, fill, fillCode, isNewPassword, isOtp, passwordFields, scope, setValue, submitLogin, usernameField, type Input, type Kind } from "./fields";
 import { generatePassword } from "./generate";
 import { send } from "./messages";
+import { getSettings } from "./settings";
 
 export type PageMessage =
   | { type: "FILL"; username: string; password: string }
@@ -176,7 +177,13 @@ async function useLogin(input: Input, login: LoginName) {
   const res = await send({ type: "PAGE_CREDENTIAL", login });
   if (!res.ok) return;
   closeMenu();
-  fill(input, res.credential.username, res.credential.password);
+  afterFill(input, fill(input, res.credential.username, res.credential.password));
+}
+
+async function afterFill(input: Input, result: ReturnType<typeof fill>) {
+  if (!result.filled?.password || !(await getSettings()).autoSubmit) return;
+  // Give the page's framework a tick to see the new values.
+  setTimeout(() => submitLogin(input), 200);
 }
 
 // Codes usually arrive after the field is focused, so keep looking for a while.
@@ -310,7 +317,11 @@ chrome.runtime.onMessage.addListener((msg: PageMessage, _sender, respond: (r: ob
   switch (msg.type) {
     case "FILL": {
       const active = document.activeElement;
-      respond(fill(active instanceof HTMLInputElement ? active : null, msg.username, msg.password));
+      const input = active instanceof HTMLInputElement ? active : null;
+      const result = fill(input, msg.username, msg.password);
+      respond(result);
+      const pw = input ?? passwordFields(document)[0];
+      if (pw) afterFill(pw, result);
       break;
     }
     case "OFFER_SAVE":
