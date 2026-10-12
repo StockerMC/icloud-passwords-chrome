@@ -10,7 +10,7 @@ export type PageMessage =
   | { type: "OPEN_MENU" };
 
 const CSS = `
-:host { all: initial; }
+:host { all: initial; color-scheme: light dark; }
 .box {
   position: fixed; z-index: 2147483647; box-sizing: border-box;
   font: 13px/1.4 -apple-system, system-ui, sans-serif; color: CanvasText; background: Canvas;
