@@ -20,6 +20,7 @@ npm run build
 - Password generation
 - Verification codes from the Passwords app and Messages, plus Gmail or the Mail app if you turn them on
 - Offers to save new logins
+- Signs in for you after a fill, if you turn it on
 - Popup to fill, copy or generate a password
 
 Touch ID prompts come from macOS; turn them off under System Settings →
