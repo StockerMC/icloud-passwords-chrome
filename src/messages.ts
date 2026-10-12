@@ -13,6 +13,7 @@ export type Request =
   | { type: "PAGE_LOGINS" }
   | { type: "PAGE_CREDENTIAL"; login: LoginName }
   | { type: "SUBMITTED"; username: string; password: string; newPassword: boolean }
+  | { type: "GENERATED"; username: string; password: string }
   | { type: "SAVE_PENDING"; accept: boolean }
   | { type: "OPEN_POPUP" }
   | { type: "PAGE_CODES" }

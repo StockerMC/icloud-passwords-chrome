@@ -197,6 +197,12 @@ const handlers: Handlers = {
     recordSubmission(sender.tab!.id!, sender.url!, req);
   },
 
+  async GENERATED(req, sender) {
+    const tabId = sender.tab!.id!;
+    filled.set(tabId, { password: req.password, at: Date.now() });
+    if (client.paired) await client.save(tabId, new URL(sender.url!).host, req.username, req.password);
+  },
+
   async SAVE_PENDING(req, sender) {
     const tabId = sender.tab!.id!;
     const pending = pendingSaves.get(tabId);

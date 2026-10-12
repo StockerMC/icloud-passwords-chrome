@@ -139,11 +139,14 @@ async function useCode(input: Input, entry: OneTimeCode) {
   fillCode(input, res.code);
 }
 
+// Saved as soon as it's picked, like Safari, so a failed sign-up doesn't lose it.
 function generateItem(input: Input) {
   return row("Use strong password", undefined, () => {
     const password = generatePassword();
-    for (const pw of passwordFields(scope(input))) setValue(pw, password);
+    const fields = passwordFields(scope(input));
+    for (const pw of fields) setValue(pw, password);
     closeMenu();
+    send({ type: "GENERATED", username: usernameField(scope(input), fields[0])?.value.trim() ?? "", password });
   });
 }
 
