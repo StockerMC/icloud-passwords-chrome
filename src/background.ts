@@ -25,6 +25,8 @@ interface PendingSave {
   timer?: number;
 }
 const pendingSaves = new Map<number, PendingSave>();
+// What this extension last filled per tab, so its own fills are never offered for saving.
+const filled = new Map<number, { password: string; at: number }>();
 // Username from a username-only page, for logins split across two pages.
 const stageOne = new Map<string, { username: string; at: number }>();
 
@@ -74,6 +76,8 @@ async function logins(tabId: number, url: string) {
 function recordSubmission(tabId: number, url: string, req: Extract<Request, { type: "SUBMITTED" }>) {
   const host = hostname(url);
   let username = req.username;
+  const own = filled.get(tabId);
+  if (own && own.password === req.password && Date.now() - own.at < 10 * 60_000) return;
   if (!req.password) {
     if (username) stageOne.set(host, { username, at: Date.now() });
     return;
@@ -124,7 +128,10 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (Date.now() - pending.at > SAVE_WINDOW_MS) pendingSaves.delete(tabId);
   else offerSave(tabId);
 });
-chrome.tabs.onRemoved.addListener((tabId) => pendingSaves.delete(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  pendingSaves.delete(tabId);
+  filled.delete(tabId);
+});
 
 type Sender = chrome.runtime.MessageSender;
 type Handlers = { [K in Request["type"]]: (req: Extract<Request, { type: K }>, sender: Sender) => Promise<Data<K>> };
@@ -163,6 +170,7 @@ const handlers: Handlers = {
     const tab = await chrome.tabs.get(req.tabId);
     if (tab.url !== req.url) throw new Error("Tab navigated away");
     const { username, password } = await credential(req.tabId, req.url, req.login);
+    filled.set(req.tabId, { password, at: Date.now() });
     const msg: PageMessage = { type: "FILL", username, password };
     const result = await chrome.tabs.sendMessage<PageMessage, { error?: string }>(req.tabId, msg, { frameId: 0 });
     if (result?.error) throw new Error(result.error);
@@ -179,7 +187,10 @@ const handlers: Handlers = {
   },
 
   async PAGE_CREDENTIAL(req, sender) {
-    return { credential: await credential(sender.tab!.id!, sender.url!, req.login) };
+    const tabId = sender.tab!.id!;
+    const c = await credential(tabId, sender.url!, req.login);
+    filled.set(tabId, { password: c.password, at: Date.now() });
+    return { credential: c };
   },
 
   async SUBMITTED(req, sender) {
