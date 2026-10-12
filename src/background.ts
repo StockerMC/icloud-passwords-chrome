@@ -101,7 +101,8 @@ async function offerSave(tabId: number) {
     return;
   }
   const msg: PageMessage = { type: "OFFER_SAVE", username: pending.username, hostname: pending.hostname };
-  chrome.tabs.sendMessage(tabId, msg, { frameId: 0 }).catch(() => pendingSaves.delete(tabId));
+  // The page may still be navigating; the next load completing tries again.
+  chrome.tabs.sendMessage(tabId, msg, { frameId: 0 }).catch(() => (pending.offered = false));
 }
 
 // Tabs open before the install have no content script yet.
