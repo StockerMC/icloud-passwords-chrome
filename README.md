@@ -12,7 +12,7 @@ npm run build
 ```
 
 1. Open the browser's extensions page (e.g. `chrome://extensions`), enable Developer mode, Load unpacked, pick `dist/`.
-2. Click the toolbar icon (⌘⇧L) and type the code macOS shows. This repeats once per browser launch.
+2. Click the toolbar icon and type the code macOS shows. This repeats once per browser launch.
 
 ## Features
 
