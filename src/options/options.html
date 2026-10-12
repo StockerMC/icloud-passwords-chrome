@@ -41,8 +41,14 @@
     <label class="check"><input type="checkbox" id="mail" /> Offer codes from Mail.app</label>
     <p class="help muted">
       Same, from the inbox of every account in Mail.app. Needs
-      <code>npm run install-host</code> once; the first use asks to allow
-      osascript to control Mail.
+      <code>npm run install-host</code> once; the first use asks to let the
+      iCloud Passwords Codes app control Mail.
+    </p>
+    <label class="check"><input type="checkbox" id="messages" /> Offer codes from Messages</label>
+    <p class="help muted">
+      Same, from texts that arrived in Messages. Needs
+      <code>npm run install-host</code>, then Full Disk Access for the
+      iCloud Passwords Codes app it builds, under System Settings → Privacy &amp; Security.
     </p>
   </section>
   <script type="module" src="options.js"></script>

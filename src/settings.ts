@@ -2,10 +2,11 @@ export interface Settings {
   rememberMinutes: 0 | 1 | 5 | 15;
   gmail: boolean;
   mail: boolean;
+  messages: boolean;
   autoSubmit: boolean;
 }
 
-export const defaults: Settings = { rememberMinutes: 5, gmail: false, mail: false, autoSubmit: false };
+export const defaults: Settings = { rememberMinutes: 5, gmail: false, mail: false, messages: false, autoSubmit: false };
 
 export async function getSettings(): Promise<Settings> {
   return { ...defaults, ...(await chrome.storage.sync.get(defaults)) };

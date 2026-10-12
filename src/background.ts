@@ -2,7 +2,7 @@ import { AppleClient, HelperError } from "./apple/client";
 import type { Credential, LoginName } from "./apple/enums";
 import type { PageMessage } from "./content";
 import { gmailCodes } from "./gmail";
-import { mailCodes } from "./mail";
+import { localCodes } from "./local";
 import type { Data, Request, State } from "./messages";
 import { getSettings } from "./settings";
 
@@ -220,8 +220,8 @@ const handlers: Handlers = {
       ? client.oneTimeCodes(sender.tab!.id!, sender.frameId ?? 0, frameURLs(sender))
       : [];
     const gmail = settings.gmail ? gmailCodes() : [];
-    const mail = settings.mail ? mailCodes() : [];
-    return { codes: (await Promise.all([helper, gmail, mail])).flat() };
+    const local = settings.mail || settings.messages ? localCodes(settings) : [];
+    return { codes: (await Promise.all([helper, gmail, local])).flat() };
   },
 
   async PAGE_CODE(req, sender) {

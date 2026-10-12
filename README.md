@@ -18,7 +18,7 @@ npm run build
 
 - Saved logins in a menu on login fields
 - Password generation
-- Verification codes from the Passwords app, plus Gmail or the Mail app if you turn them on
+- Verification codes from the Passwords app, plus Gmail, the Mail app or Messages if you turn them on
 - Offers to save new logins
 - Signs in for you after a fill, if you turn it on
 - Popup to fill, copy or generate a password
@@ -34,14 +34,19 @@ Apple's extension re-asks for the pairing code every few hours, puts an
 This one pairs once per browser launch, only shows a menu on login and code fields,
 and does nothing until you focus one.
 
-## Email codes
+## Codes from email and Messages
 
-Apple's helper doesn't pass on codes that arrive in Messages or Mail, so email
-is read directly. Both sources are off by default; turn them on in Options
-(gear in the popup).
+Apple's helper doesn't pass on codes that arrive in Mail or Messages, so they
+are read directly. All three sources are off by default; turn them on in
+Options (gear in the popup).
 
 - Gmail: the inbox feed of the account the browser is signed in to.
-- Mail app: a script that asks Mail for the last ten minutes of messages. Register it once with `npm run install-host`; macOS then asks once to let osascript control Mail.
+- Mail app and Messages: a small app built on your Mac from the `host`
+  folder by `npm run install-host`. Mail asks once to let it control Mail.
+  Messages keeps its texts in a protected database, so the app needs Full
+  Disk Access, granted to it alone; the installer opens the right System
+  Settings pane and a Finder window to drag it from. It returns only recent
+  messages that look like they carry a code, and only to this extension.
 
 ## Browsers
 
@@ -60,8 +65,6 @@ allowlists.
 ## Limitations
 
 - Windows isn't currently supported.
-- Codes that arrive in Messages aren't offered. Safari gets them, but Apple's
-  helper doesn't pass them on to other browsers.
 - It's not on the Chrome Web Store because the helper only talks to Apple's
   extension ID, so the manifest reuses Apple's key and can't be published.
 
