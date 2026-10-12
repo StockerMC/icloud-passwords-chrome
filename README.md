@@ -43,12 +43,13 @@ Both sources are off by default; turn them on in Options (gear in the popup).
 
 ## Browsers
 
-Chrome and Brave work as is. Edge, Vivaldi, Arc and Opera need the helper's
-manifest linked into their own directory:
+Chrome and Brave work as is. Other Chromium browsers look for the helper's
+manifest in their own folder under `~/Library/Application Support`, so link
+it there once, e.g. for Edge:
 
 ```sh
 ln -s /Library/Google/Chrome/NativeMessagingHosts/com.apple.passwordmanager.json \
-  "/Library/Application Support/Chromium/NativeMessagingHosts/"
+  ~/Library/Application\ Support/Microsoft\ Edge/NativeMessagingHosts/
 ```
 
 Unsigned Chromium builds don't work; Apple's helper only runs under browsers it
