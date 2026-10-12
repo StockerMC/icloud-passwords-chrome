@@ -58,7 +58,7 @@ export function classify(el: EventTarget | null): Kind | null {
   if (!(el instanceof HTMLInputElement) || el.readOnly || el.disabled || !visible(el)) return null;
   if (isOtp(el)) return "otp";
   if (el.type === "password") return isNewPassword(el) ? "newPassword" : "password";
-  if (el.type === "search" || el.getAttribute("role") === "searchbox") return null;
+  if (el.type === "search" || el.getAttribute("role") === "searchbox" || hinted(el, ["search", "filter", "query"])) return null;
   if (!isUsernameLike(el)) return null;
   // A lone username field is a two-step login; one next to a password field is a login form.
   const login = passwordFields(scope(el)).length > 0 || el.autocomplete === "username" || el.autocomplete === "email" || hinted(el, ["email", "user", "login"]);
