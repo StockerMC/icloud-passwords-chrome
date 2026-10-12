@@ -32,7 +32,7 @@ export class AppleClient {
   private queues = new Map<number, Promise<unknown>>();
   private _capabilities?: Capabilities;
   onDisconnect?: (reason: string) => void;
-  // A code just arrived in Messages.
+  // The helper announces a new code; never seen in practice on macOS 15.
   onOneTimeCode?: () => void;
 
   get connected() {
@@ -140,8 +140,7 @@ export class AppleClient {
     return { username: entry.USR as string, password: entry.PWD as string, sites: (entry.sites as string[]) ?? [] };
   }
 
-  // Lists codes for the frame: authenticator entries without a value, and
-  // codes from Messages with one.
+  // Lists the authenticator entries for the frame, without values.
   async oneTimeCodes(tabId: number, frameId: number, frameURLs: string[], username?: string) {
     const body = { ACT: Action.GhostSearch, TYPE: "oneTimeCodes", frameURLs, ...(username && { username }) };
     const entries = await this.query(Command.GetOneTimeCodes, "CmdGetOneTimeCodes", { tabId, frameId }, body, 8000);

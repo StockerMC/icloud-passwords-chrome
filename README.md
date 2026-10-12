@@ -18,7 +18,7 @@ npm run build
 
 - Saved logins in a menu on login fields
 - Password generation
-- Verification codes from the Passwords app and Messages, plus Gmail or the Mail app if you turn them on
+- Verification codes from the Passwords app, plus Gmail or the Mail app if you turn them on
 - Offers to save new logins
 - Signs in for you after a fill, if you turn it on
 - Popup to fill, copy or generate a password
@@ -36,8 +36,9 @@ and does nothing until you focus one.
 
 ## Email codes
 
-Apple's helper only passes on codes from Messages, so email is read directly.
-Both sources are off by default; turn them on in Options (gear in the popup).
+Apple's helper doesn't pass on codes that arrive in Messages or Mail, so email
+is read directly. Both sources are off by default; turn them on in Options
+(gear in the popup).
 
 - Gmail: the inbox feed of the account the browser is signed in to.
 - Mail app: a script that asks Mail for the last ten minutes of messages. Register it once with `npm run install-host`; macOS then asks once to let osascript control Mail.
@@ -59,6 +60,8 @@ allowlists.
 ## Limitations
 
 - Windows isn't currently supported.
+- Codes that arrive in Messages aren't offered. Safari gets them, but Apple's
+  helper doesn't pass them on to other browsers.
 - It's not on the Chrome Web Store because the helper only talks to Apple's
   extension ID, so the manifest reuses Apple's key and can't be published.
 
