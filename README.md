@@ -2,6 +2,8 @@
 
 Fill iCloud Keychain passwords in Chrome, Brave and other Chromium browsers on macOS.
 
+<img src="assets/demo.gif" width="720" alt="Filling a login, a verification code and a generated password from the menu">
+
 ## Install
 
 ```sh
@@ -9,22 +11,27 @@ npm install
 npm run build
 ```
 
-1. Open the browser's extensions page (`chrome://extensions`, `brave://extensions`),
-   enable Developer mode, Load unpacked, pick `dist/`.
-2. Click the toolbar icon (⌘⇧L) and type the code macOS shows. This repeats
-   once per browser launch.
+1. Open the browser's extensions page (e.g. `chrome://extensions`), enable Developer mode, Load unpacked, pick `dist/`.
+2. Click the toolbar icon (⌘⇧L) and type the code macOS shows. This repeats once per browser launch.
 
 ## Features
 
-- Login fields get a menu of saved logins.
-- Sign-up forms offer a strong password.
-- Verification-code fields offer codes from the Passwords app and Messages,
-  and from Gmail or Mail.app if turned on in Options.
-- After a login with a new password, a bar offers to save it.
-- The popup lists logins, copies passwords and generates new ones.
+- Saved logins in a menu on login fields
+- Password generation
+- Verification codes from the Passwords app and Messages, plus Gmail or the Mail app if you turn them on
+- Offers to save new logins
+- Popup to fill, copy or generate a password
 
 Touch ID prompts come from macOS; turn them off under System Settings →
 Touch ID & Password → Password AutoFill.
+
+## Compared with Apple's extension
+
+Apple's extension re-asks for the pairing code every few hours, puts an
+"Enable AutoFill" balloon on every field, and lags on busy pages.
+
+This one pairs once per browser launch, only shows a menu on login and code fields,
+and does nothing until you focus one.
 
 ## Email codes
 
@@ -32,9 +39,7 @@ Apple's helper only passes on codes from Messages, so email is read directly.
 Both sources are off by default; turn them on in Options (gear in the popup).
 
 - Gmail: the inbox feed of the account the browser is signed in to.
-- Mail.app: a script that asks Mail for the last ten minutes of messages.
-  Register it once with `npm run install-host`; macOS then asks once to let
-  osascript control Mail.
+- Mail app: a script that asks Mail for the last ten minutes of messages. Register it once with `npm run install-host`; macOS then asks once to let osascript control Mail.
 
 ## Browsers
 
