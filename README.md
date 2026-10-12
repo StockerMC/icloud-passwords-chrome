@@ -26,6 +26,17 @@ npm run build
 Touch ID prompts come from macOS; turn them off under System Settings →
 Touch ID & Password → Password AutoFill.
 
+## Compared with Apple's extension
+
+- Pairs once per browser launch. The open connection to the helper keeps the
+  extension alive, so the code isn't asked for again a few hours later.
+- The menu appears only on login, sign-up and code fields, and a code field
+  gets nothing unless a code exists. No "Enable AutoFill" balloon.
+- Nothing runs per keystroke or scans the page for images.
+- Fills go to the frame that asked and skip hidden fields.
+- Touch ID can be remembered for a few minutes, and username-only pages fill
+  without it.
+
 ## Email codes
 
 Apple's helper only passes on codes from Messages, so email is read directly.
