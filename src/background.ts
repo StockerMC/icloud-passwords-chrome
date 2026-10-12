@@ -112,6 +112,12 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "open-menu") return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "OPEN_MENU" } satisfies PageMessage).catch(() => {});
+});
+
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   const pending = pendingSaves.get(tabId);
   if (!pending || info.status !== "complete") return;

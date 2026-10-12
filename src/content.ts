@@ -6,7 +6,8 @@ import { send } from "./messages";
 export type PageMessage =
   | { type: "FILL"; username: string; password: string }
   | { type: "OFFER_SAVE"; username: string; hostname: string }
-  | { type: "CODE_ARRIVED" };
+  | { type: "CODE_ARRIVED" }
+  | { type: "OPEN_MENU" };
 
 const CSS = `
 :host { all: initial; }
@@ -316,6 +317,19 @@ chrome.runtime.onMessage.addListener((msg: PageMessage, _sender, respond: (r: ob
     case "CODE_ARRIVED": {
       const active = document.activeElement;
       if (active instanceof HTMLInputElement && isOtp(active)) openMenu(active, "otp");
+      respond({ ok: true });
+      break;
+    }
+    case "OPEN_MENU": {
+      if (!document.hasFocus()) break;
+      dismissed = null;
+      const active = document.activeElement;
+      const input = active instanceof HTMLInputElement ? active : usernameField(document) ?? passwordFields(document)[0];
+      const kind = input && classify(input);
+      if (input && kind) {
+        input.focus();
+        openMenu(input, kind);
+      }
       respond({ ok: true });
       break;
     }

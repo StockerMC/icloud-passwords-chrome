@@ -47,6 +47,13 @@
         "default": "Ctrl+Shift+L",
         "mac": "Command+Shift+L"
       }
+    },
+    "open-menu": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Period",
+        "mac": "Command+Shift+Period"
+      },
+      "description": "Show the menu for the focused field"
     }
   },
   "icons": {
