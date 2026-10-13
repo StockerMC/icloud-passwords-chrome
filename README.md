@@ -6,12 +6,14 @@ Fill iCloud Keychain passwords in Chrome, Brave and other Chromium browsers on m
 
 ## Install
 
+Download the zip from the [latest release](https://github.com/StockerMC/icloud-passwords-chrome/releases/latest) and unzip it, or build it yourself:
+
 ```sh
 npm install
 npm run build
 ```
 
-1. Open the browser's extensions page (e.g. `chrome://extensions`), enable Developer mode, Load unpacked, pick `dist/`.
+1. Open the browser's extensions page (e.g. `chrome://extensions`), enable Developer mode, Load unpacked, pick the unzipped folder (or `dist/`).
 2. Click the toolbar icon and type the code macOS shows. This repeats once per browser launch.
 
 ## Features
