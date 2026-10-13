@@ -17,7 +17,8 @@ export type Request =
   | { type: "SAVE_PENDING"; accept: boolean }
   | { type: "OPEN_POPUP" }
   | { type: "PAGE_CODES" }
-  | { type: "PAGE_CODE"; entry: OneTimeCode };
+  | { type: "PAGE_CODE"; entry: OneTimeCode }
+  | { type: "SOURCES" };
 
 // What each request answers with, beyond ok. Requests not listed answer with ok alone.
 export interface Replies {
@@ -30,6 +31,7 @@ export interface Replies {
   PAGE_CREDENTIAL: { credential: Credential };
   PAGE_CODES: { codes: OneTimeCode[] };
   PAGE_CODE: { code: string };
+  SOURCES: { sources: { gmail: string; mail: string; messages: string } };
 }
 
 export type Data<K extends Request["type"]> = K extends keyof Replies ? Replies[K] : void;

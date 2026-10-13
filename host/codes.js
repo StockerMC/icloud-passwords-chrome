@@ -106,6 +106,16 @@ function archivedText(hex) {
   return ObjC.unwrap($.NSString.alloc.initWithDataEncoding($.NSData.dataWithBytesLength(bytes.slice(i, i + length), length), $.NSUTF8StringEncoding)) || "";
 }
 
+function check(fn) {
+  try {
+    fn();
+    return "";
+  } catch (e) {
+    if (!Application("Mail").running() && String(e).includes("Mail")) return "Mail isn't running";
+    return /not authori[sz]ed|-1743/i.test(String(e)) ? "Allow the app to control Mail when macOS asks" : String(e);
+  }
+}
+
 const argv = ObjC.deepUnwrap($.NSProcessInfo.processInfo.arguments);
 const query = argv.indexOf("--query");
 if (query >= 0) {
@@ -119,6 +129,10 @@ if (query >= 0) {
   $(JSON.stringify(out)).writeToFileAtomicallyEncodingError(reply, true, $.NSUTF8StringEncoding, null);
 } else for (let req; (req = read()); ) {
   try {
+    if (req.status) {
+      write({ mail: check(() => mail(Date.now() - 60000)), messages: check(() => messages(Date.now() - 60000)) });
+      continue;
+    }
     const out = [];
     if (req.mail) out.push(...mail(req.since));
     if (req.messages) out.push(...messages(req.since));

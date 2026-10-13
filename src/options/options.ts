@@ -1,21 +1,42 @@
+import { send } from "../messages";
 import { getSettings, setSettings, type Settings } from "../settings";
 
-const select = document.getElementById("remember") as HTMLSelectElement;
-const gmail = document.getElementById("gmail") as HTMLInputElement;
-const mail = document.getElementById("mail") as HTMLInputElement;
-const messages = document.getElementById("messages") as HTMLInputElement;
-const submit = document.getElementById("submit") as HTMLInputElement;
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const select = $<HTMLSelectElement>("remember");
+const submit = $<HTMLInputElement>("submit");
+const sources = {
+  gmail: $<HTMLInputElement>("gmail"),
+  mail: $<HTMLInputElement>("mail"),
+  messages: $<HTMLInputElement>("messages"),
+};
+type Source = keyof typeof sources;
+
 getSettings().then((s) => {
   select.value = String(s.rememberMinutes);
-  gmail.checked = s.gmail;
-  mail.checked = s.mail;
-  messages.checked = s.messages;
   submit.checked = s.autoSubmit;
+  sources.gmail.checked = s.gmail;
+  sources.mail.checked = s.mail;
+  sources.messages.checked = s.messages;
+  check((Object.keys(sources) as Source[]).filter((k) => sources[k].checked));
 });
+
 select.addEventListener("change", () => {
   setSettings({ rememberMinutes: Number(select.value) as Settings["rememberMinutes"] });
 });
-gmail.addEventListener("change", () => setSettings({ gmail: gmail.checked }));
-mail.addEventListener("change", () => setSettings({ mail: mail.checked }));
-messages.addEventListener("change", () => setSettings({ messages: messages.checked }));
 submit.addEventListener("change", () => setSettings({ autoSubmit: submit.checked }));
+for (const [name, box] of Object.entries(sources) as [Source, HTMLInputElement][]) {
+  box.addEventListener("change", () => {
+    setSettings({ [name]: box.checked });
+    if (box.checked) check([name]);
+    else $(`${name}-status`).textContent = "";
+  });
+}
+
+async function check(names: Source[]) {
+  if (!names.length) return;
+  for (const name of names) $(`${name}-status`).textContent = "Checking…";
+  const res = await send({ type: "SOURCES" });
+  for (const name of names) {
+    $(`${name}-status`).textContent = res.ok ? res.sources[name] || "Working" : res.error;
+  }
+}

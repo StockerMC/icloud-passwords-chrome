@@ -5,6 +5,14 @@ import { CODE_WINDOW_MS, extractCode } from "./codes";
 // signed in to, so no OAuth is needed.
 const FEED = "https://mail.google.com/mail/u/0/feed/atom";
 
+export async function gmailStatus() {
+  try {
+    const res = await fetch(FEED, { credentials: "include" });
+    if (res.ok && (await res.text()).includes("<feed")) return "";
+  } catch {}
+  return "Not signed in to Gmail in this browser";
+}
+
 export async function gmailCodes(): Promise<OneTimeCode[]> {
   let xml: string;
   try {

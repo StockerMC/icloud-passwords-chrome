@@ -12,6 +12,23 @@ interface Message {
   received: number;
 }
 
+export async function localStatus() {
+  let reply: { mail?: string; messages?: string };
+  try {
+    reply = await chrome.runtime.sendNativeMessage(HOST, { status: true });
+  } catch {
+    const missing = "Not installed: run npm run install-host";
+    return { mail: missing, messages: missing };
+  }
+  const messages = reply.messages ?? "";
+  return {
+    mail: reply.mail ?? "",
+    messages: /authorization denied/i.test(messages)
+      ? "Needs Full Disk Access for the iCloud Passwords Codes app (System Settings → Privacy & Security)"
+      : messages,
+  };
+}
+
 export async function localCodes(sources: { mail: boolean; messages: boolean }): Promise<OneTimeCode[]> {
   let reply: { messages?: Message[] };
   try {

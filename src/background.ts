@@ -1,8 +1,8 @@
 import { AppleClient, HelperError } from "./apple/client";
 import type { Credential, LoginName } from "./apple/enums";
 import type { PageMessage } from "./content";
-import { gmailCodes } from "./gmail";
-import { localCodes } from "./local";
+import { gmailCodes, gmailStatus } from "./gmail";
+import { localCodes, localStatus } from "./local";
 import type { Data, Request, State } from "./messages";
 import { getSettings } from "./settings";
 
@@ -222,6 +222,11 @@ const handlers: Handlers = {
     const gmail = settings.gmail ? gmailCodes() : [];
     const local = settings.mail || settings.messages ? localCodes(settings) : [];
     return { codes: (await Promise.all([helper, gmail, local])).flat() };
+  },
+
+  async SOURCES() {
+    const [gmail, local] = await Promise.all([gmailStatus(), localStatus()]);
+    return { sources: { gmail, ...local } };
   },
 
   async PAGE_CODE(req, sender) {
