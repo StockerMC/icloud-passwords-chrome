@@ -32,7 +32,8 @@ Apple's extension re-asks for the pairing code every few hours, puts an
 "Enable AutoFill" balloon on every field, and lags on busy pages.
 
 This one pairs once per browser launch, only shows a menu on login and code fields,
-and does nothing until you focus one.
+and does nothing until you focus one. It can also fill verification codes that
+arrive in Mail, Messages or Gmail, which Apple's extension can't.
 
 ## Codes from email and Messages
 
