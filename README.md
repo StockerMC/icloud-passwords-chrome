@@ -48,6 +48,7 @@ Options (gear in the popup).
   Disk Access, granted to it alone; the installer opens the right System
   Settings pane and a Finder window to drag it from. It returns only recent
   messages that look like they carry a code, and only to this extension.
+  `npm run uninstall-host` removes the app and its registrations.
 
 ## Browsers
 

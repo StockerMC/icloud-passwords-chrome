@@ -9,7 +9,8 @@
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test:e2e": "node e2e/pair.mjs",
-    "install-host": "node host/install.mjs"
+    "install-host": "node host/install.mjs",
+    "uninstall-host": "node host/uninstall.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.4",
