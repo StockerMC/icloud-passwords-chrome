@@ -1,4 +1,4 @@
-import type { LoginName } from "../apple/enums";
+import type { LoginName, OneTimeCode } from "../apple/enums";
 import { generatePassword } from "../generate";
 import { send } from "../messages";
 
@@ -50,6 +50,43 @@ async function loadLogins() {
   $("empty").textContent = "No saved passwords for this site.";
   $("empty").hidden = res.logins.length > 0;
   show("logins");
+  loadCodes(tab);
+}
+
+async function loadCodes(tab: { id: number; url: string }) {
+  $("codes").replaceChildren();
+  $("codes-title").hidden = true;
+  const res = await send({ type: "CODES", tabId: tab.id, url: tab.url });
+  if (!res.ok || res.codes.length === 0) return;
+  $("codes").replaceChildren(...res.codes.map((entry) => codeRow(entry, tab)));
+  $("codes-title").hidden = false;
+}
+
+function codeRow(entry: OneTimeCode, tab: { id: number; url: string }) {
+  const li = document.createElement("li");
+  li.className = "code";
+  const main = document.createElement("span");
+  main.className = "user";
+  main.textContent = entry.code || "Verification code";
+  const sub = document.createElement("span");
+  sub.className = "sub";
+  sub.textContent = entry.source === "totp" ? entry.username || entry.domain : `From ${entry.source}`;
+  const copy = document.createElement("button");
+  copy.className = "copy";
+  copy.textContent = "Copy";
+  copy.title = "Copy code";
+  li.append(main, sub, copy);
+
+  copy.addEventListener("click", async () => {
+    li.classList.add("busy");
+    const res = await send({ type: "CODE", tabId: tab.id, url: tab.url, entry });
+    li.classList.remove("busy");
+    if (!res.ok) return fail(res.error);
+    await navigator.clipboard.writeText(res.code);
+    copy.textContent = "Copied";
+    setTimeout(() => (copy.textContent = "Copy"), 1200);
+  });
+  return li;
 }
 
 function row(login: LoginName, tab: { id: number; url: string }) {
@@ -113,6 +150,13 @@ $("generate").addEventListener("click", async () => {
   await navigator.clipboard.writeText(generatePassword());
   $("generate").textContent = "Copied to clipboard";
   setTimeout(() => ($("generate").textContent = "Generate password"), 1500);
+});
+
+$("passwords-app").addEventListener("click", async () => {
+  const tab = await currentTab();
+  const res = await send({ type: "OPEN_PASSWORDS_APP", url: tab?.url });
+  if (!res.ok) return fail(res.error);
+  window.close();
 });
 
 $("retry").addEventListener("click", start);

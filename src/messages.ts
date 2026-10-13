@@ -18,7 +18,10 @@ export type Request =
   | { type: "OPEN_POPUP" }
   | { type: "PAGE_CODES" }
   | { type: "PAGE_CODE"; entry: OneTimeCode }
-  | { type: "SOURCES" };
+  | { type: "SOURCES" }
+  | { type: "CODES"; tabId: number; url: string }
+  | { type: "CODE"; tabId: number; url: string; entry: OneTimeCode }
+  | { type: "OPEN_PASSWORDS_APP"; url?: string };
 
 // What each request answers with, beyond ok. Requests not listed answer with ok alone.
 export interface Replies {
@@ -32,6 +35,8 @@ export interface Replies {
   PAGE_CODES: { codes: OneTimeCode[] };
   PAGE_CODE: { code: string };
   SOURCES: { sources: { gmail: string; mail: string; messages: string } };
+  CODES: { codes: OneTimeCode[] };
+  CODE: { code: string };
 }
 
 export type Data<K extends Request["type"]> = K extends keyof Replies ? Replies[K] : void;

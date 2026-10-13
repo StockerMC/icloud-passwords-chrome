@@ -1,5 +1,5 @@
 import { AppleClient, HelperError } from "./apple/client";
-import type { Credential, LoginName } from "./apple/enums";
+import type { Credential, LoginName, OneTimeCode } from "./apple/enums";
 import type { PageMessage } from "./content";
 import { gmailCodes, gmailStatus } from "./gmail";
 import { localCodes, localStatus } from "./local";
@@ -45,6 +45,23 @@ function frameURLs(sender: chrome.runtime.MessageSender) {
   const urls = [sender.url!];
   if (sender.tab?.url && sender.tab.url !== sender.url) urls.push(sender.tab.url);
   return urls;
+}
+
+// Codes for a frame: the helper's entries plus whatever email sources are on.
+async function codes(tabId: number, frameId: number, urls: string[]) {
+  const settings = await getSettings();
+  const helper = client.paired && client.capabilities?.canFillOneTimeCodes ? client.oneTimeCodes(tabId, frameId, urls) : [];
+  const gmail = settings.gmail ? gmailCodes() : [];
+  const local = settings.mail || settings.messages ? localCodes(settings) : [];
+  return (await Promise.all([helper, gmail, local])).flat();
+}
+
+async function code(tabId: number, frameId: number, urls: string[], entry: OneTimeCode) {
+  if (entry.code) return entry.code;
+  const read = await client.readOneTimeCodes(tabId, frameId, urls, entry.username || undefined);
+  const match = read.find((c) => c.username === entry.username && c.code) ?? read.find((c) => c.code);
+  if (!match) throw new Error("No code available");
+  return match.code;
 }
 
 function state(): State {
@@ -215,13 +232,7 @@ const handlers: Handlers = {
   },
 
   async PAGE_CODES(_req, sender) {
-    const settings = await getSettings();
-    const helper = client.paired && client.capabilities?.canFillOneTimeCodes
-      ? client.oneTimeCodes(sender.tab!.id!, sender.frameId ?? 0, frameURLs(sender))
-      : [];
-    const gmail = settings.gmail ? gmailCodes() : [];
-    const local = settings.mail || settings.messages ? localCodes(settings) : [];
-    return { codes: (await Promise.all([helper, gmail, local])).flat() };
+    return { codes: await codes(sender.tab!.id!, sender.frameId ?? 0, frameURLs(sender)) };
   },
 
   async SOURCES() {
@@ -230,11 +241,19 @@ const handlers: Handlers = {
   },
 
   async PAGE_CODE(req, sender) {
-    if (req.entry.code) return { code: req.entry.code };
-    const codes = await client.readOneTimeCodes(sender.tab!.id!, sender.frameId ?? 0, frameURLs(sender), req.entry.username || undefined);
-    const match = codes.find((c) => c.username === req.entry.username && c.code) ?? codes.find((c) => c.code);
-    if (!match) throw new Error("No code available");
-    return { code: match.code };
+    return { code: await code(sender.tab!.id!, sender.frameId ?? 0, frameURLs(sender), req.entry) };
+  },
+
+  async CODES(req) {
+    return { codes: await codes(req.tabId, 0, [req.url]) };
+  },
+
+  async CODE(req) {
+    return { code: await code(req.tabId, 0, [req.url], req.entry) };
+  },
+
+  async OPEN_PASSWORDS_APP(req) {
+    client.launchPasswordsApp(req.url);
   },
 };
 

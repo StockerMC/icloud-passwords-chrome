@@ -77,4 +77,8 @@ li .copy {
   visibility: hidden;
 }
 li:hover .copy { visibility: visible; }
+li.code { cursor: default; }
+li .sub { color: var(--muted); font-size: 11px; white-space: nowrap; }
+#codes-title { margin-top: 10px; }
+button.link + button.link { margin-left: 14px; }
 li.busy { opacity: 0.6; pointer-events: none; }

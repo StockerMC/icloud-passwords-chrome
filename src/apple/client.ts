@@ -165,6 +165,12 @@ export class AppleClient {
     }
   }
 
+  // Opens the Passwords app, searched for the site. The helper sends no reply.
+  launchPasswordsApp(url?: string) {
+    if (!this.port || !this.paired) throw new HelperError("Not paired");
+    this.port.postMessage({ cmd: Command.LaunchPasswordsApp, ...(url && { searchQueryURL: url }) });
+  }
+
   close() {
     if (!this.port) return;
     try {
