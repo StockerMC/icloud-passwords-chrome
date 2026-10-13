@@ -16,14 +16,11 @@ npm run build
 
 ## Features
 
-- Saved logins in a menu on login fields
+- Saved logins in a menu on login fields, with optional sign-in after filling
 - Password generation
 - Verification codes from the Passwords app, plus Gmail, the Mail app or Messages if you turn them on
 - Adds a site's verification code to the Passwords app from its 2FA setup page
 - Offers to save new logins
-- Signs in for you after a fill, if you turn it on
-- Popup to fill or copy a login, copy a code, generate a password, or open
-  the Passwords app
 
 Touch ID prompts come from macOS; turn them off under System Settings →
 Touch ID & Password → Password AutoFill.
