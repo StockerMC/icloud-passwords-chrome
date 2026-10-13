@@ -42,6 +42,7 @@ export interface Capabilities {
   shouldUseBase64?: boolean;
   secretSessionVersion?: number;
   canFillOneTimeCodes?: boolean;
+  scanForOTPURI?: boolean;
   operatingSystem?: { name: string; majorVersion: number; minorVersion: number };
 }
 

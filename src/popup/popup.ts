@@ -51,6 +51,18 @@ async function loadLogins() {
   $("empty").hidden = res.logins.length > 0;
   show("logins");
   loadCodes(tab);
+  loadOtpSetup(tab);
+}
+
+async function loadOtpSetup(tab: { id: number; url: string }) {
+  const res = await send({ type: "OTP_SETUP", tabId: tab.id });
+  const uri = res.ok ? res.uri : "";
+  $("otp-setup").hidden = !uri;
+  $("otp-setup").onclick = async () => {
+    const r = await send({ type: "OTP_REGISTER", tabId: tab.id, url: tab.url, uri });
+    if (!r.ok) return fail(r.error);
+    window.close();
+  };
 }
 
 async function loadCodes(tab: { id: number; url: string }) {

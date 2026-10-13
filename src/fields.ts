@@ -108,6 +108,26 @@ export function submitLogin(input: Input) {
   }
 }
 
+// A 2FA setup page's otpauth link, or failing that its visible setup key:
+// base32 with optional spacing, in a section that talks about keys or scanning.
+// Base32 covers every letter, so a digit is required to rule out shouted prose.
+export function otpSetup() {
+  const link = document.querySelector<HTMLAnchorElement>('a[href^="otpauth://"]');
+  if (link) return link.href;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const el = node.parentElement;
+    if (!el || ["SCRIPT", "STYLE"].includes(el.tagName) || !visible(el)) continue;
+    const match = node.nodeValue?.match(/(?<![A-Za-z0-9])[A-Z2-7](?:[ -]?[A-Z2-7]){15,63}(?![A-Za-z0-9])/);
+    if (!match) continue;
+    const key = match[0].replace(/[ -]/g, "");
+    if (!/[2-7]/.test(key)) continue;
+    const context = (el.closest("li, td, form, section, article, main") ?? document.body).textContent?.toLowerCase() ?? "";
+    if (/key|secret|manual|scan/.test(context)) return key;
+  }
+  return "";
+}
+
 export function fill(anchor: Input | null, username: string, password: string) {
   const root = anchor ? scope(anchor) : document;
   const pw = anchor?.type === "password" ? anchor : passwordFields(root)[0] ?? null;

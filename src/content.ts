@@ -1,5 +1,5 @@
 import type { LoginName, OneTimeCode } from "./apple/enums";
-import { classify, fill, fillCode, isNewPassword, isOtp, passwordFields, scope, setValue, submitLogin, usernameField, type Input, type Kind } from "./fields";
+import { classify, fill, fillCode, isNewPassword, isOtp, otpSetup, passwordFields, scope, setValue, submitLogin, usernameField, type Input, type Kind } from "./fields";
 import { generatePassword } from "./generate";
 import { send } from "./messages";
 import { getSettings } from "./settings";
@@ -8,7 +8,8 @@ export type PageMessage =
   | { type: "FILL"; username: string; password: string }
   | { type: "OFFER_SAVE"; username: string; hostname: string }
   | { type: "CODE_ARRIVED" }
-  | { type: "OPEN_MENU" };
+  | { type: "OPEN_MENU" }
+  | { type: "OTP_SETUP" };
 
 const CSS = `
 :host { all: initial; color-scheme: light dark; }
@@ -332,6 +333,12 @@ chrome.runtime.onMessage.addListener((msg: PageMessage, _sender, respond: (r: ob
       const active = document.activeElement;
       if (active instanceof HTMLInputElement && isOtp(active)) openMenu(active, "otp");
       respond({ ok: true });
+      break;
+    }
+    // Only a frame that found something answers, so the first reply is a hit.
+    case "OTP_SETUP": {
+      const uri = otpSetup();
+      if (uri) respond({ uri });
       break;
     }
     case "OPEN_MENU": {

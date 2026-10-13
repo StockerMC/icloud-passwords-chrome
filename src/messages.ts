@@ -21,7 +21,9 @@ export type Request =
   | { type: "SOURCES" }
   | { type: "CODES"; tabId: number; url: string }
   | { type: "CODE"; tabId: number; url: string; entry: OneTimeCode }
-  | { type: "OPEN_PASSWORDS_APP"; url?: string };
+  | { type: "OPEN_PASSWORDS_APP"; url?: string }
+  | { type: "OTP_SETUP"; tabId: number }
+  | { type: "OTP_REGISTER"; tabId: number; url: string; uri: string };
 
 // What each request answers with, beyond ok. Requests not listed answer with ok alone.
 export interface Replies {
@@ -37,6 +39,7 @@ export interface Replies {
   SOURCES: { sources: { gmail: string; mail: string; messages: string } };
   CODES: { codes: OneTimeCode[] };
   CODE: { code: string };
+  OTP_SETUP: { uri: string };
 }
 
 export type Data<K extends Request["type"]> = K extends keyof Replies ? Replies[K] : void;

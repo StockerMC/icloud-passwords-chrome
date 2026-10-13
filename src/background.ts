@@ -255,6 +255,23 @@ const handlers: Handlers = {
   async OPEN_PASSWORDS_APP(req) {
     client.launchPasswordsApp(req.url);
   },
+
+  async OTP_SETUP(req) {
+    const msg: PageMessage = { type: "OTP_SETUP" };
+    const found = await chrome.tabs.sendMessage<PageMessage, { uri?: string } | undefined>(req.tabId, msg).catch(() => undefined);
+    return { uri: found?.uri ?? "" };
+  },
+
+  async OTP_REGISTER(req) {
+    const host = hostname(req.url);
+    let uri = req.uri;
+    if (!uri.startsWith("otpauth://")) {
+      const username = (await logins(req.tabId, req.url))[0]?.username ?? "";
+      const label = encodeURIComponent(username ? `${host}:${username}` : host);
+      uri = `otpauth://totp/${label}?secret=${uri}&issuer=${encodeURIComponent(host)}`;
+    }
+    client.setUpVerificationCode(host, uri);
+  },
 };
 
 chrome.runtime.onMessage.addListener((req: Request, sender, respond: (r: object) => void) => {

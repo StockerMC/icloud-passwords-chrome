@@ -171,6 +171,14 @@ export class AppleClient {
     this.port.postMessage({ cmd: Command.LaunchPasswordsApp, ...(url && { searchQueryURL: url }) });
   }
 
+  // Hands an otpauth URI to the Passwords app, which opens its setup sheet.
+  // Apple's extension sends this as a variant of the launch command.
+  setUpVerificationCode(hostname: string, uri: string) {
+    if (!this.port || !this.paired) throw new HelperError("Not paired");
+    if (!this._capabilities?.scanForOTPURI) throw new HelperError("Helper can't set up verification codes");
+    this.port.postMessage({ cmd: Command.LaunchPasswordsApp, setUpTOTPPageURL: hostname, setUpTOTPURI: uri });
+  }
+
   close() {
     if (!this.port) return;
     try {

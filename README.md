@@ -19,6 +19,7 @@ npm run build
 - Saved logins in a menu on login fields
 - Password generation
 - Verification codes from the Passwords app, plus Gmail, the Mail app or Messages if you turn them on
+- Adds a site's verification code to the Passwords app from its 2FA setup page
 - Offers to save new logins
 - Signs in for you after a fill, if you turn it on
 - Popup to fill, copy or generate a password
