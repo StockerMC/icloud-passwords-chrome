@@ -174,9 +174,9 @@ async function useLogin(input: Input, login: LoginName) {
     setValue(input, login.username);
     return;
   }
-  const res = await send({ type: "PAGE_CREDENTIAL", login }).catch((e: unknown) => ({ ok: false as const, error: String(e) }));
+  const res = await send({ type: "PAGE_CREDENTIAL", login });
   if (!res.ok) {
-    menu.box.replaceChildren(muted(res.error));
+    menu.box.replaceChildren(muted(res.error), ...menu.box.querySelectorAll(".row"));
     return;
   }
   closeMenu();
