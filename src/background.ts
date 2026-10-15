@@ -86,8 +86,18 @@ async function credential(tabId: number, url: string, login: LoginName) {
   return fresh;
 }
 
+// Apple matches by registrable domain, so tenants of a shared host (a.workday.com, b.workday.com)
+// all come back. Keep a login only if one of its sites is this host or a parent or child of it.
+function sameSite(site: string, host: string) {
+  const s = site.replace(/^[a-z]+:\/\//i, "").split(/[/:?#]/)[0].toLowerCase();
+  return s === host || host.endsWith(`.${s}`) || s.endsWith(`.${host}`);
+}
+
 async function logins(tabId: number, url: string) {
-  return client.paired ? client.loginNames(tabId, hostname(url)) : [];
+  if (!client.paired) return [];
+  const host = hostname(url).toLowerCase();
+  const all = await client.loginNames(tabId, host);
+  return all.filter((l) => l.sites.length === 0 || l.sites.some((s) => sameSite(s, host)));
 }
 
 function recordSubmission(tabId: number, url: string, req: Extract<Request, { type: "SUBMITTED" }>) {
