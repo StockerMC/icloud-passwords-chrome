@@ -102,14 +102,13 @@ function muted(text: string) {
 
 async function openMenu(input: Input, kind: Kind) {
   anchor = input;
-  menu.box.replaceChildren();
   const items = await (kind === "otp" ? codeItems(input) : kind === "newPassword" ? [generateItem(input)] : loginItems(input));
   if (anchor !== input) return;
   if (!items) {
     closeMenu();
     return;
   }
-  menu.box.append(...items);
+  menu.box.replaceChildren(...items);
   positionMenu();
   menu.show();
 }
@@ -175,8 +174,11 @@ async function useLogin(input: Input, login: LoginName) {
     setValue(input, login.username);
     return;
   }
-  const res = await send({ type: "PAGE_CREDENTIAL", login });
-  if (!res.ok) return;
+  const res = await send({ type: "PAGE_CREDENTIAL", login }).catch((e: unknown) => ({ ok: false as const, error: String(e) }));
+  if (!res.ok) {
+    menu.box.replaceChildren(muted(res.error));
+    return;
+  }
   closeMenu();
   afterFill(input, fill(input, res.credential.username, res.credential.password));
 }
@@ -216,6 +218,8 @@ document.addEventListener("focusin", (e) => {
   if (input === dismissed) return;
   dismissed = null;
   const kind = classify(input);
+  // Pages that re-focus the field would otherwise rebuild the rows mid-click.
+  if (kind && input === anchor && menu.open) return;
   if (kind) openMenu(input, kind);
   else if (menu.open) closeMenu();
 });
