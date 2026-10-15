@@ -86,18 +86,21 @@ async function credential(tabId: number, url: string, login: LoginName) {
   return fresh;
 }
 
-// Apple matches by registrable domain, so tenants of a shared host (a.workday.com, b.workday.com)
-// all come back. Keep a login only if one of its sites is this host or a parent or child of it.
-function sameSite(site: string, host: string) {
-  const s = site.replace(/^[a-z]+:\/\//i, "").split(/[/:?#]/)[0].toLowerCase();
-  return s === host || host.endsWith(`.${s}`) || s.endsWith(`.${host}`);
+// Apple matches by registrable domain, so tenants of a shared host (a.myworkdayjobs.com,
+// b.myworkdayjobs.com) see each other's logins. www counts as the bare domain so a login
+// saved on www.x still shows on login.x.
+function onSite(login: LoginName, host: string) {
+  const h = host.replace(/^www\./, "");
+  return login.sites.length === 0 || login.sites.some((site) => {
+    const s = site.replace(/^[a-z]+:\/\//i, "").split(/[/:?#]/)[0].toLowerCase().replace(/^www\./, "");
+    return s === h || h.endsWith(`.${s}`) || s.endsWith(`.${h}`);
+  });
 }
 
 async function logins(tabId: number, url: string) {
   if (!client.paired) return [];
-  const host = hostname(url).toLowerCase();
-  const all = await client.loginNames(tabId, host);
-  return all.filter((l) => l.sites.length === 0 || l.sites.some((s) => sameSite(s, host)));
+  const host = hostname(url);
+  return (await client.loginNames(tabId, host)).filter((l) => onSite(l, host));
 }
 
 function recordSubmission(tabId: number, url: string, req: Extract<Request, { type: "SUBMITTED" }>) {
@@ -125,8 +128,9 @@ async function offerSave(tabId: number) {
   if (!pending || pending.offered || !client.paired) return;
   pending.offered = true;
   clearTimeout(pending.timer);
-  const known = await client.loginNames(tabId, pending.hostname.replace(/:\d+$/, "")).catch(() => [] as LoginName[]);
-  const unknown = !known.some((l) => l.username === pending.username);
+  const host = pending.hostname.replace(/:\d+$/, "");
+  const known = await client.loginNames(tabId, host).catch(() => [] as LoginName[]);
+  const unknown = !known.some((l) => l.username === pending.username && onSite(l, host));
   if (!unknown && !pending.newPassword) {
     pendingSaves.delete(tabId);
     return;
