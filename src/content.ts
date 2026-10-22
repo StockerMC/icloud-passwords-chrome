@@ -174,9 +174,12 @@ async function useLogin(input: Input, login: LoginName) {
     setValue(input, login.username);
     return;
   }
+  const rows = [...menu.box.querySelectorAll(".row")];
+  menu.box.replaceChildren(muted("Reading password…"), ...rows);
   const res = await send({ type: "PAGE_CREDENTIAL", login });
+  if (anchor !== input) return;
   if (!res.ok) {
-    menu.box.replaceChildren(muted(res.error), ...menu.box.querySelectorAll(".row"));
+    menu.box.replaceChildren(muted(res.error), ...rows);
     return;
   }
   closeMenu();
