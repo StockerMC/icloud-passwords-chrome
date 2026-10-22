@@ -18,6 +18,7 @@ import { SrpSession } from "./srp";
 const HOST = "com.apple.passwordmanager";
 const BROWSER_NAME = "Chrome";
 const VERSION = "1.0";
+const AUTH_TIMEOUT = 90_000;
 
 type Message = { cmd: number; [key: string]: unknown };
 type Pending = { resolve: (m: Message) => void; reject: (e: Error) => void; timer?: number };
@@ -128,13 +129,15 @@ export class AppleClient {
     return entries.map((e) => ({ username: e.USR as string, sites: (e.sites as string[]) ?? [] }));
   }
 
-  // May block on Touch ID, so no timeout.
+  // Blocks on Touch ID. A read that never replies would otherwise hold up
+  // every later read, so it gets a generous limit.
   async password(tabId: number, hostname: string, login: LoginName): Promise<Credential> {
     const [entry] = await this.query(
       Command.GetPasswordForLoginName,
       "CmdGetPassword4LoginName",
       { tabId, frameId: 0, url: login.sites[0] ?? hostname },
       { ACT: Action.Search, URL: hostname, USR: login.username },
+      AUTH_TIMEOUT,
     );
     if (!entry) throw new HelperError("No password returned");
     return { username: entry.USR as string, password: entry.PWD as string, sites: (entry.sites as string[]) ?? [] };
@@ -147,10 +150,10 @@ export class AppleClient {
     return entries.map(oneTimeCode);
   }
 
-  // Reads current values right before filling. May block on Touch ID.
+  // Reads current values right before filling. Blocks on Touch ID.
   async readOneTimeCodes(tabId: number, frameId: number, frameURLs: string[], username?: string) {
     const body = { ACT: Action.Search, TYPE: "oneTimeCodes", frameURLs, ...(username && { username }) };
-    const entries = await this.query(Command.DidFillOneTimeCode, "CmdDidFillOneTimeCode", { tabId, frameId }, body);
+    const entries = await this.query(Command.DidFillOneTimeCode, "CmdDidFillOneTimeCode", { tabId, frameId }, body, AUTH_TIMEOUT);
     return entries.map(oneTimeCode);
   }
 
