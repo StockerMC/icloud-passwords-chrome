@@ -29,27 +29,18 @@ Touch ID & Password → Password AutoFill.
 
 ## Compared with Apple's extension
 
-Apple's extension re-asks for the pairing code every few hours, puts an
-"Enable AutoFill" balloon on every field, and lags on busy pages.
-
-This one pairs once per browser launch, only shows a menu on login and code fields,
-and does nothing until you focus one. It can also fill verification codes that
-arrive in Mail, Messages or Gmail, which Apple's extension can't.
+Pairs once per browser launch instead of every few hours, shows a menu only
+on login and code fields, and fills codes from Mail, Messages and Gmail.
 
 ## Codes from email and Messages
 
-Apple's helper doesn't pass on codes that arrive in Mail or Messages, so they
-are read directly. All three sources are off by default; turn them on in
-Options (gear in the popup).
+Off by default; turn them on in Options (gear in the popup).
 
-- Gmail: the inbox feed of the account the browser is signed in to.
-- Mail app and Messages: a small app built on your Mac from the `host`
-  folder by `npm run install-host`. Mail asks once to let it control Mail.
-  Messages keeps its texts in a protected database, so the app needs Full
-  Disk Access, granted to it alone; the installer opens the right System
-  Settings pane and a Finder window to drag it from. It returns only recent
-  messages that look like they carry a code, and only to this extension.
-  `npm run uninstall-host` removes the app and its registrations.
+- Gmail: reads the inbox feed of the account the browser is signed in to.
+- Mail and Messages: `npm run install-host` builds a small helper app. Mail
+  asks once to let it control Mail; Messages needs Full Disk Access for that
+  app, which the installer walks you through. `npm run uninstall-host`
+  removes it.
 
 ## Browsers
 
